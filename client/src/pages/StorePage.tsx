@@ -127,7 +127,7 @@ export default function StorePage({
     if (!walletData || walletData.balance < price) {
       toast({
         title: "Insufficient Funds",
-        description: `You need $${price.toFixed(2)} to buy this game. Your balance is $${(walletData?.balance || 0).toFixed(2)}. Please add funds to your wallet.`,
+        description: `You need £${price.toFixed(2)} to buy this game. Your balance is £${(walletData?.balance || 0).toFixed(2)}. Please add funds to your wallet.`,
         variant: "destructive",
       });
       setBuyDialog({ open: false, game: null });
@@ -186,7 +186,7 @@ export default function StorePage({
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card border border-card-border">
                   <span className="text-sm text-muted-foreground">Balance:</span>
                   <span className="text-sm font-semibold text-primary" data-testid="text-wallet-balance">
-                    ${walletData.balance.toFixed(2)}
+                    £{walletData.balance.toFixed(2)}
                   </span>
                 </div>
               )}
@@ -289,22 +289,22 @@ export default function StorePage({
           <DialogHeader>
             <DialogTitle>Confirm Purchase</DialogTitle>
             <DialogDescription>
-              You are about to purchase {buyDialog.game?.title} for ${buyDialog.game?.price?.toFixed(2)}.
+              You are about to purchase {buyDialog.game?.title} for £{buyDialog.game?.price?.toFixed(2)}.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <div className="flex justify-between items-center p-3 rounded-lg bg-muted">
               <span className="text-sm text-muted-foreground">Your Balance:</span>
-              <span className="font-semibold">${(walletData?.balance || 0).toFixed(2)}</span>
+              <span className="font-semibold">£{(walletData?.balance || 0).toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center p-3 rounded-lg bg-muted mt-2">
               <span className="text-sm text-muted-foreground">Game Price:</span>
-              <span className="font-semibold text-primary">${buyDialog.game?.price?.toFixed(2)}</span>
+              <span className="font-semibold text-primary">£{buyDialog.game?.price?.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center p-3 rounded-lg bg-card border border-card-border mt-2">
               <span className="text-sm font-medium">After Purchase:</span>
               <span className="font-semibold">
-                ${((walletData?.balance || 0) - (buyDialog.game?.price || 0)).toFixed(2)}
+                £{((walletData?.balance || 0) - (buyDialog.game?.price || 0)).toFixed(2)}
               </span>
             </div>
           </div>

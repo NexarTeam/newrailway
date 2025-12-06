@@ -1034,7 +1034,7 @@ export async function registerRoutes(
       const { amount } = req.body;
       
       if (!amount || amount < 5 || amount > 100) {
-        return res.status(400).json({ message: "Amount must be between $5 and $100" });
+        return res.status(400).json({ message: "Amount must be between £5 and £100" });
       }
 
       const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
@@ -1052,10 +1052,10 @@ export async function registerRoutes(
         payment_method_types: ['card'],
         line_items: [{
           price_data: {
-            currency: 'usd',
+            currency: 'gbp',
             product_data: {
               name: 'NexarOS Wallet Funds',
-              description: `Add $${amount} to your NexarOS wallet`,
+              description: `Add £${amount} to your NexarOS wallet`,
             },
             unit_amount: amount * 100,
           },

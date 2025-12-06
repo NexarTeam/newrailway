@@ -14,7 +14,7 @@ import {
   ArrowDownLeft, 
   ArrowUpRight, 
   Loader2,
-  DollarSign,
+  PoundSterling,
   Clock,
   Gamepad2
 } from "lucide-react";
@@ -110,7 +110,7 @@ export default function WalletPage() {
     if (isNaN(amountNum) || amountNum < 5 || amountNum > 100) {
       toast({
         title: "Invalid Amount",
-        description: "Please enter an amount between $5 and $100",
+        description: "Please enter an amount between £5 and £100",
         variant: "destructive",
       });
       return;
@@ -135,9 +135,9 @@ export default function WalletPage() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
+    return new Date(dateString).toLocaleDateString("en-GB", {
       day: "numeric",
+      month: "short",
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
@@ -168,14 +168,14 @@ export default function WalletPage() {
           <Card className="md:col-span-2 lg:col-span-1">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5" />
+                <PoundSterling className="w-5 h-5" />
                 Balance
               </CardTitle>
               <CardDescription>Your current wallet balance</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="text-4xl font-bold text-foreground" data-testid="text-wallet-balance">
-                ${(walletData?.balance || 0).toFixed(2)}
+                £{(walletData?.balance || 0).toFixed(2)}
               </div>
               <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
                 <Gamepad2 className="w-4 h-4" />
@@ -196,7 +196,7 @@ export default function WalletPage() {
               {isAddingFunds ? (
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="amount">Amount (USD)</Label>
+                    <Label htmlFor="amount">Amount (GBP)</Label>
                     <Input
                       id="amount"
                       type="number"
@@ -204,7 +204,7 @@ export default function WalletPage() {
                       max="100"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
-                      placeholder="Enter amount ($5 - $100)"
+                      placeholder="Enter amount (£5 - £100)"
                       data-testid="input-amount"
                     />
                   </div>
@@ -217,7 +217,7 @@ export default function WalletPage() {
                         onClick={() => setAmount(preset.toString())}
                         data-testid={`button-preset-${preset}`}
                       >
-                        ${preset}
+                        £{preset}
                       </Button>
                     ))}
                   </div>
@@ -303,7 +303,7 @@ export default function WalletPage() {
                     <div className={`font-bold ${
                       tx.amount >= 0 ? "text-green-500" : "text-destructive"
                     }`}>
-                      {tx.amount >= 0 ? "+" : ""}${Math.abs(tx.amount).toFixed(2)}
+                      {tx.amount >= 0 ? "+" : ""}£{Math.abs(tx.amount).toFixed(2)}
                     </div>
                   </div>
                 ))}

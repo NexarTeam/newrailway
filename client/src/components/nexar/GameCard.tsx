@@ -154,7 +154,7 @@ export default function GameCard({
         {game.price !== undefined && !game.isOwned && (
           <div className="absolute top-2 left-2">
             <Badge variant="default" className="bg-primary text-primary-foreground">
-              ${game.price.toFixed(2)}
+              £{game.price.toFixed(2)}
             </Badge>
           </div>
         )}
@@ -197,7 +197,7 @@ export default function GameCard({
             ) : game.price !== undefined ? (
               <>
                 <ShoppingCart className="w-5 h-5 mr-2" />
-                Buy ${game.price.toFixed(2)}
+                Buy £{game.price.toFixed(2)}
               </>
             ) : (
               <>
