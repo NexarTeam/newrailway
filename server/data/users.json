@@ -16,5 +16,23 @@
     "avatarUrl": "",
     "bio": "",
     "createdAt": "2025-12-06T12:44:00.308Z"
+  },
+  {
+    "id": "092544e1-34f0-4578-b222-ea6b9f5b0199",
+    "email": "harrymb12345@gmail.com",
+    "username": "harry12345",
+    "passwordHash": "$2b$10$PaCrpAzLdmC1BNfRv4e21OWxe69pSXbWy0Y.XNjc5cpia234pogYe",
+    "avatarUrl": "",
+    "bio": "SaltCrusader",
+    "createdAt": "2025-12-06T13:22:18.143Z"
+  },
+  {
+    "id": "50c392ac-b69e-46f5-aceb-16e1dd1ecace",
+    "email": "user_1765033074036@test.com",
+    "username": "testuser_1765033076668",
+    "passwordHash": "$2b$10$uc3H66uWKgZHJRpOqVUBMO1s0sLjglY7J3KtKDU9fprMYYelmi7V6",
+    "avatarUrl": "",
+    "bio": "",
+    "createdAt": "2025-12-06T14:58:02.304Z"
   }
 ]

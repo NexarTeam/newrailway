@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { useApi } from "@/hooks/useApi";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, User, Calendar } from "lucide-react";
+import { Loader2, Save, User, Calendar, Upload, Camera } from "lucide-react";
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth();
@@ -16,16 +16,58 @@ export default function ProfilePage() {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [username, setUsername] = useState(user?.username || "");
-  const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || "");
   const [bio, setBio] = useState(user?.bio || "");
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const previewUrl = URL.createObjectURL(file);
+    setAvatarPreview(previewUrl);
+
+    setIsUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+
+      const token = localStorage.getItem("nexar_token");
+      const response = await fetch("/api/auth/avatar", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Upload failed");
+      }
+
+      const updated = await response.json();
+      updateUser(updated);
+      toast({ title: "Avatar updated", description: "Your new avatar has been saved." });
+    } catch (error) {
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Could not upload avatar",
+        variant: "destructive",
+      });
+      setAvatarPreview(null);
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
       const updated = await patch<typeof user>("/api/auth/profile", {
         username,
-        avatarUrl,
         bio,
       });
       if (updated) {
@@ -72,12 +114,34 @@ export default function ProfilePage() {
 
         <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-[#2A2A2A]">
           <div className="flex items-start gap-6 mb-6">
-            <Avatar className="w-24 h-24 border-2 border-[#d00024]">
-              <AvatarImage src={avatarUrl || user.avatarUrl} />
-              <AvatarFallback className="bg-[#2A2A2A] text-[#EAEAEA] text-2xl">
-                {getInitials(user.username)}
-              </AvatarFallback>
-            </Avatar>
+            <div className="relative group">
+              <Avatar className="w-24 h-24 border-2 border-[#d00024]">
+                <AvatarImage src={avatarPreview || user.avatarUrl} />
+                <AvatarFallback className="bg-[#2A2A2A] text-[#EAEAEA] text-2xl">
+                  {getInitials(user.username)}
+                </AvatarFallback>
+              </Avatar>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleAvatarChange}
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                className="hidden"
+                data-testid="input-avatar-file"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingAvatar}
+                className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                data-testid="button-upload-avatar"
+              >
+                {isUploadingAvatar ? (
+                  <Loader2 className="w-6 h-6 text-white animate-spin" />
+                ) : (
+                  <Camera className="w-6 h-6 text-white" />
+                )}
+              </button>
+            </div>
 
             <div className="flex-1">
               <h2
@@ -120,18 +184,8 @@ export default function ProfilePage() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="avatarUrl" className="text-[#EAEAEA]">
-                  Avatar URL
-                </Label>
-                <Input
-                  id="avatarUrl"
-                  value={avatarUrl}
-                  onChange={(e) => setAvatarUrl(e.target.value)}
-                  placeholder="https://example.com/avatar.jpg"
-                  data-testid="input-avatar-url"
-                  className="bg-[#111111] border-[#333333] text-[#EAEAEA] focus:border-[#d00024]"
-                />
+              <div className="space-y-2 text-[#A3A3A3] text-sm">
+                <p>Hover over your avatar above and click to upload a new image.</p>
               </div>
 
               <div className="space-y-2">

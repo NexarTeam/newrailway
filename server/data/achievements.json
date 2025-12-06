@@ -10,5 +10,17 @@
     "userId": "3c402b53-e99b-4e45-b8b6-991e843ac0f0",
     "achievementId": "first_login",
     "unlockedAt": "2025-12-06T12:44:00.310Z"
+  },
+  {
+    "id": "2e05c348-3d3c-484b-ac28-ab9cc85c0583",
+    "userId": "092544e1-34f0-4578-b222-ea6b9f5b0199",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T13:22:18.144Z"
+  },
+  {
+    "id": "1dec959b-e81f-4ddd-b451-36453fe9c0fb",
+    "userId": "50c392ac-b69e-46f5-aceb-16e1dd1ecace",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T14:58:02.305Z"
   }
 ]

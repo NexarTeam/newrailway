@@ -3,6 +3,9 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 import {
   generateToken,
   authMiddleware,
@@ -17,6 +20,34 @@ import {
   updateOne,
   deleteOne,
 } from "./utils/fileDb";
+
+const avatarStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(process.cwd(), "server/uploads/avatars");
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req: AuthenticatedRequest, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const filename = `${req.user?.userId}-${Date.now()}${ext}`;
+    cb(null, filename);
+  },
+});
+
+const uploadAvatar = multer({
+  storage: avatarStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only JPEG, PNG, GIF, and WebP images are allowed"));
+    }
+  },
+});
 
 interface User {
   id: string;
@@ -75,6 +106,16 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
+  // Serve uploaded avatars statically
+  app.use("/uploads/avatars", (req, res, next) => {
+    const avatarPath = path.join(process.cwd(), "server/uploads/avatars", req.path);
+    if (fs.existsSync(avatarPath)) {
+      res.sendFile(avatarPath);
+    } else {
+      res.status(404).json({ message: "Avatar not found" });
+    }
+  });
+
   // ==================== AUTH ROUTES ====================
   
   app.post("/api/auth/register", async (req, res) => {
@@ -213,6 +254,41 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Profile update error:", error);
       res.status(500).json({ message: "Profile update failed" });
+    }
+  });
+
+  app.post("/api/auth/avatar", authMiddleware, uploadAvatar.single("avatar"), async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+      
+      const updated = updateOne<User>("users.json", (u) => u.id === req.user!.userId, { avatarUrl });
+      if (!updated) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (updated.avatarUrl && updated.bio) {
+        const existing = findOne<UserAchievement>("achievements.json", 
+          (a) => a.userId === req.user!.userId && a.achievementId === "profile_complete"
+        );
+        if (!existing) {
+          insertOne<UserAchievement>("achievements.json", {
+            id: uuidv4(),
+            userId: req.user!.userId,
+            achievementId: "profile_complete",
+            unlockedAt: new Date().toISOString(),
+          });
+        }
+      }
+
+      const { passwordHash: _, ...userWithoutPassword } = updated;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Avatar upload error:", error);
+      res.status(500).json({ message: "Avatar upload failed" });
     }
   });
 
