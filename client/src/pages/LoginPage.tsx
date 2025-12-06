@@ -6,30 +6,60 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LogIn, Eye, EyeOff } from "lucide-react";
+import { Loader2, LogIn, Eye, EyeOff, Mail, RefreshCw } from "lucide-react";
 import NexarLogo from "@/components/nexar/NexarLogo";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showVerificationMessage, setShowVerificationMessage] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const { login } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
+  const handleResendVerification = async () => {
+    setIsResending(true);
+    try {
+      await apiRequest("POST", "/api/auth/resend-verification", { email });
+      toast({
+        title: "Verification email sent",
+        description: "Please check your inbox for the verification link.",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to send email",
+        description: "Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResending(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setShowVerificationMessage(false);
 
     try {
       await login(email, password);
       toast({ title: "Welcome back!", description: "You have been logged in successfully." });
       setLocation("/");
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Invalid credentials";
+      
+      // Check if this is a verification required error
+      if (errorMessage.includes("verify your email")) {
+        setShowVerificationMessage(true);
+      }
+      
       toast({
         title: "Login failed",
-        description: error instanceof Error ? error.message : "Invalid credentials",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -112,6 +142,35 @@ export default function LoginPage() {
               )}
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
+
+            {showVerificationMessage && (
+              <div className="bg-[#111111] border border-[#333333] rounded-lg p-4 mt-4">
+                <div className="flex items-start gap-3">
+                  <Mail className="w-5 h-5 text-[#d00024] mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm text-[#A3A3A3]">
+                      Your email is not verified. Check your inbox or click below to resend.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleResendVerification}
+                      disabled={isResending}
+                      data-testid="button-resend-verification"
+                      className="mt-2 text-[#d00024] hover:text-[#ff1a3a] p-0 h-auto"
+                    >
+                      {isResending ? (
+                        <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4 mr-1" />
+                      )}
+                      {isResending ? "Sending..." : "Resend verification email"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </form>
 
           <div className="mt-6 text-center">

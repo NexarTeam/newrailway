@@ -246,22 +246,15 @@ export async function registerRoutes(
         unlockedAt: new Date().toISOString(),
       });
 
+      // Send verification email - don't log in user until verified
       sendVerificationEmail(email, username, verificationToken).catch(err => {
         console.error("Failed to send verification email:", err);
       });
 
-      const token = generateToken({
-        userId: user.id,
-        email: user.email,
-        username: user.username,
-      });
-
-      const firstLoginAchievement = ACHIEVEMENTS_LIST.find(a => a.id === "first_login");
-      const { passwordHash: _, verificationToken: __, ...userWithoutPassword } = user;
+      // Don't return token - user must verify email first
       res.status(201).json({ 
-        user: userWithoutPassword, 
-        token,
-        unlockedAchievements: firstLoginAchievement ? [firstLoginAchievement] : []
+        message: "Account created! Please check your email to verify your account before logging in.",
+        requiresVerification: true
       });
     } catch (error) {
       console.error("Register error:", error);
@@ -287,6 +280,15 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
+      // Check if user is verified
+      if (!user.verified) {
+        return res.status(403).json({ 
+          message: "Please verify your email address before logging in. Check your inbox for the verification link.",
+          requiresVerification: true,
+          email: user.email
+        });
+      }
+
       const token = generateToken({
         userId: user.id,
         email: user.email,
@@ -298,6 +300,38 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // Resend verification email endpoint
+  app.post("/api/auth/resend-verification", async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      const user = findOne<User>("users.json", (u) => u.email === email);
+      if (!user) {
+        // Don't reveal if email exists or not for security
+        return res.json({ message: "If an account exists with this email, a verification link has been sent." });
+      }
+
+      if (user.verified) {
+        return res.status(400).json({ message: "This account is already verified. You can log in." });
+      }
+
+      // Generate a new verification token
+      const newToken = uuidv4();
+      updateOne<User>("users.json", (u) => u.id === user.id, { verificationToken: newToken });
+
+      await sendVerificationEmail(email, user.username, newToken);
+      
+      res.json({ message: "If an account exists with this email, a verification link has been sent." });
+    } catch (error) {
+      console.error("Resend verification error:", error);
+      res.status(500).json({ message: "Failed to send verification email" });
     }
   });
 

@@ -2,12 +2,11 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
-import { useNotifications } from "@/hooks/useNotifications";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, UserPlus, Eye, EyeOff } from "lucide-react";
+import { Loader2, UserPlus, Eye, EyeOff, Mail, CheckCircle } from "lucide-react";
 import NexarLogo from "@/components/nexar/NexarLogo";
 
 export default function RegisterPage() {
@@ -17,8 +16,8 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [registrationComplete, setRegistrationComplete] = useState(false);
   const { register } = useAuth();
-  const { showAchievement } = useNotifications();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -46,12 +45,13 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const unlockedAchievements = await register(email, username, password);
-      toast({ title: "Welcome to NexarOS!", description: "Your account has been created." });
-      unlockedAchievements.forEach((achievement) => {
-        showAchievement(achievement);
-      });
-      setLocation("/");
+      const result = await register(email, username, password);
+      if (result.requiresVerification) {
+        setRegistrationComplete(true);
+      } else {
+        toast({ title: "Welcome to NexarOS!", description: result.message });
+        setLocation("/login");
+      }
     } catch (error) {
       toast({
         title: "Registration failed",
@@ -62,6 +62,58 @@ export default function RegisterPage() {
       setIsLoading(false);
     }
   };
+
+  // Show verification required message after registration
+  if (registrationComplete) {
+    return (
+      <div className="min-h-screen bg-[#000000] flex items-center justify-center p-6">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="w-full max-w-md"
+        >
+          <div className="bg-[#1A1A1A] rounded-2xl p-8 border border-[#2A2A2A] shadow-2xl text-center">
+            <div className="flex flex-col items-center mb-6">
+              <div className="w-16 h-16 rounded-full bg-[#d00024]/20 flex items-center justify-center mb-4">
+                <Mail className="w-8 h-8 text-[#d00024]" />
+              </div>
+              <h1 className="text-2xl font-bold text-[#EAEAEA] uppercase tracking-wider">
+                Check Your Email
+              </h1>
+            </div>
+            
+            <p className="text-[#A3A3A3] mb-6">
+              We've sent a verification link to <span className="text-[#EAEAEA] font-medium">{email}</span>. 
+              Please check your inbox and click the link to verify your account.
+            </p>
+
+            <div className="bg-[#111111] border border-[#333333] rounded-lg p-4 mb-6">
+              <div className="flex items-start gap-3">
+                <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-[#A3A3A3] text-left">
+                  Once verified, you'll be able to log in and access all NexarOS features.
+                </p>
+              </div>
+            </div>
+
+            <Link href="/login">
+              <Button
+                data-testid="button-go-to-login"
+                className="w-full bg-[#d00024] hover:bg-[#b0001e] text-white font-semibold py-3 rounded-lg transition-all duration-200 shadow-lg shadow-[#d00024]/20"
+              >
+                Go to Login
+              </Button>
+            </Link>
+
+            <p className="text-[#666666] text-sm mt-4">
+              Didn't receive the email? Check your spam folder or try registering again.
+            </p>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#000000] flex items-center justify-center p-6">

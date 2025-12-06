@@ -17,13 +17,18 @@ interface User {
   createdAt: string;
 }
 
+interface RegisterResult {
+  requiresVerification: boolean;
+  message: string;
+}
+
 interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, username: string, password: string) => Promise<Achievement[]>;
+  register: (email: string, username: string, password: string) => Promise<RegisterResult>;
   logout: () => void;
   updateUser: (user: User) => void;
 }
@@ -86,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(data.user);
   };
 
-  const register = async (email: string, username: string, password: string): Promise<Achievement[]> => {
+  const register = async (email: string, username: string, password: string): Promise<{ requiresVerification: boolean; message: string }> => {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -99,10 +104,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const data = await res.json();
-    localStorage.setItem("nexar_token", data.token);
-    setToken(data.token);
-    setUser(data.user);
-    return data.unlockedAchievements || [];
+    // Registration now requires email verification before login
+    return { 
+      requiresVerification: data.requiresVerification || false,
+      message: data.message || "Account created"
+    };
   };
 
   const logout = () => {
