@@ -13,7 +13,6 @@ const mockGames = [
     id: "2", 
     title: "Stellar Odyssey",
     isInstalled: false,
-    isSteam: true,
     genre: "Adventure"
   },
   {

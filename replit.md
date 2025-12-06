@@ -117,11 +117,9 @@ Preferred communication style: Simple, everyday language.
 
 **Third-Party Services**:
 - None currently integrated
-- Designed for future Steam library import (manual JSON upload)
 - Mock update checker (ready for real OTA update system)
 
 **File Upload**:
-- Steam library JSON import functionality
 - Avatar URL support (external hosting expected)
 
 **Session Management**:
