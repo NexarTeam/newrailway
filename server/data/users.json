@@ -112,5 +112,69 @@
     "verificationToken": "89481e19-84f8-4ee8-aaa7-190bf1dbc851",
     "walletBalance": 0,
     "ownedGames": []
+  },
+  {
+    "id": "ad4e3732-0f7e-416b-ae17-b35ec42e20c2",
+    "email": "ATG5sP@example.com",
+    "username": "user_ATG5sP",
+    "passwordHash": "$2b$10$6POT.I5ypKurTKvTmehdbOu.UcuOn/sytP9bcuSRbIN8rexNC0qm2",
+    "avatarUrl": "",
+    "bio": "",
+    "createdAt": "2025-12-06T23:03:46.415Z",
+    "verified": true,
+    "walletBalance": 0,
+    "ownedGames": []
+  },
+  {
+    "id": "492a5e56-9652-4066-8afb-1ce8a558ff82",
+    "email": "test-m_Yiwd@example.com",
+    "username": "usert8xvl",
+    "passwordHash": "$2b$10$I8dNlZXgFxZHiQAH/BSXUONZj/XAIwxPoo3dwNHN15qFa9mOteX2O",
+    "avatarUrl": "",
+    "bio": "",
+    "createdAt": "2025-12-06T23:09:08.217Z",
+    "verified": true,
+    "walletBalance": 0,
+    "ownedGames": [],
+    "parentalControls": {
+      "enabled": true,
+      "parentPin": "$2b$10$1qrnp2.FOvVCV/cSeSb.fujGSL7YfWX6unl8sifGygF0BNFEsA9Ya",
+      "playtimeLimit": null,
+      "canMakePurchases": true,
+      "restrictedRatings": [
+        "Mature"
+      ],
+      "requiresParentApproval": false,
+      "dailyPlaytimeLog": {
+        "date": "2025-12-06",
+        "minutesPlayed": 0
+      }
+    }
+  },
+  {
+    "id": "e727a32c-88e2-46b6-b872-e19604ad0605",
+    "email": "test-Y-e8pjI8@example.com",
+    "username": "userY-e8pjI8",
+    "passwordHash": "$2b$10$To0nzaeAOOPmc8jrq4IkA.o4T2kcdAgNtrkpxVE5gz.w8xCHcpe5i",
+    "avatarUrl": "",
+    "bio": "",
+    "createdAt": "2025-12-06T23:14:32.028Z",
+    "verified": true,
+    "walletBalance": 0,
+    "ownedGames": [],
+    "parentalControls": {
+      "enabled": true,
+      "parentPin": "$2b$10$bA50yRhgOiesQidcsiq3PuFNHzao.79FLqzm2kKTSFhAPhHn0aNFu",
+      "playtimeLimit": null,
+      "canMakePurchases": true,
+      "restrictedRatings": [
+        "M"
+      ],
+      "requiresParentApproval": false,
+      "dailyPlaytimeLog": {
+        "date": "2025-12-06",
+        "minutesPlayed": 0
+      }
+    }
   }
 ]

@@ -1286,6 +1286,22 @@ export async function registerRoutes(
     }
   });
 
+  const VALID_CONTENT_RATINGS = ["E", "T", "M", "18+"];
+  
+  const LEGACY_RATING_MAP: Record<string, string> = {
+    "Mature": "M",
+    "Teen": "T",
+    "Everyone": "E",
+    "7+": "E",
+    "12+": "T",
+    "16+": "M",
+  };
+
+  const normalizeRatings = (ratings: string[]): string[] => {
+    const normalized = ratings.map(r => LEGACY_RATING_MAP[r] || r);
+    return [...new Set(normalized.filter(r => VALID_CONTENT_RATINGS.includes(r)))];
+  };
+
   app.post("/api/parental/updateSettings", authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
       const { pin, playtimeLimit, canMakePurchases, restrictedRatings, requiresParentApproval } = req.body;
@@ -1307,7 +1323,9 @@ export async function registerRoutes(
       const updates: Partial<ParentalControls> = {};
       if (playtimeLimit !== undefined) updates.playtimeLimit = playtimeLimit;
       if (canMakePurchases !== undefined) updates.canMakePurchases = canMakePurchases;
-      if (restrictedRatings !== undefined) updates.restrictedRatings = restrictedRatings;
+      if (restrictedRatings !== undefined) {
+        updates.restrictedRatings = normalizeRatings(restrictedRatings);
+      }
       if (requiresParentApproval !== undefined) updates.requiresParentApproval = requiresParentApproval;
 
       const newParentalControls = { ...user.parentalControls, ...updates };
@@ -1334,6 +1352,8 @@ export async function registerRoutes(
         parentalControls.dailyPlaytimeLog = { date: today, minutesPlayed: 0 };
       }
 
+      parentalControls.restrictedRatings = normalizeRatings(parentalControls.restrictedRatings || []);
+
       const { parentPin, ...safeControls } = parentalControls;
       res.json(safeControls);
     } catch (error) {
@@ -1344,7 +1364,9 @@ export async function registerRoutes(
 
   app.post("/api/parental/checkAccess", authMiddleware, (req: AuthenticatedRequest, res) => {
     try {
-      const { gameId, rating } = req.body;
+      const { gameId, rating, gameRating } = req.body;
+      const rawRating = gameRating || rating;
+      const contentRating = rawRating ? (LEGACY_RATING_MAP[rawRating] || rawRating) : null;
 
       const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
       if (!user) {
@@ -1356,8 +1378,9 @@ export async function registerRoutes(
         return res.json({ allowed: true });
       }
 
-      if (rating && parentalControls.restrictedRatings.includes(rating)) {
-        return res.json({ allowed: false, reason: `This game is rated ${rating} which is restricted` });
+      const normalizedRestrictedRatings = normalizeRatings(parentalControls.restrictedRatings || []);
+      if (contentRating && normalizedRestrictedRatings.includes(contentRating)) {
+        return res.json({ allowed: false, reason: `This game is rated ${contentRating} which is restricted` });
       }
 
       const today = new Date().toISOString().split("T")[0];

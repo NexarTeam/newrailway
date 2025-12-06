@@ -54,7 +54,12 @@ const tabs: { id: SettingsTab; label: string; icon: typeof Monitor }[] = [
   { id: "system", label: "System", icon: Info },
 ];
 
-const CONTENT_RATINGS = ["7+", "12+", "16+", "18+", "Mature"];
+const CONTENT_RATINGS = [
+  { value: "E", label: "Everyone (E)" },
+  { value: "T", label: "Teen (T)" },
+  { value: "M", label: "Mature (M)" },
+  { value: "18+", label: "Adults Only (18+)" },
+];
 
 export default function SettingsPanel() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("display");
@@ -583,20 +588,20 @@ export default function SettingsPanel() {
                     </CardHeader>
                     <CardContent className="space-y-3">
                       {CONTENT_RATINGS.map((rating) => (
-                        <div key={rating} className="flex items-center space-x-3">
+                        <div key={rating.value} className="flex items-center space-x-3">
                           <Checkbox 
-                            id={`rating-${rating}`}
-                            checked={parentalStatus.restrictedRatings?.includes(rating)}
+                            id={`rating-${rating.value}`}
+                            checked={parentalStatus.restrictedRatings?.includes(rating.value)}
                             onCheckedChange={(checked) => {
                               const newRatings = checked
-                                ? [...(parentalStatus.restrictedRatings || []), rating]
-                                : (parentalStatus.restrictedRatings || []).filter((r) => r !== rating);
+                                ? [...(parentalStatus.restrictedRatings || []), rating.value]
+                                : (parentalStatus.restrictedRatings || []).filter((r) => r !== rating.value);
                               handleUpdateSettings({ restrictedRatings: newRatings });
                             }}
-                            data-testid={`checkbox-rating-${rating}`}
+                            data-testid={`checkbox-rating-${rating.value}`}
                           />
-                          <Label htmlFor={`rating-${rating}`} className="text-foreground cursor-pointer">
-                            Block {rating} content
+                          <Label htmlFor={`rating-${rating.value}`} className="text-foreground cursor-pointer">
+                            Block {rating.label}
                           </Label>
                         </div>
                       ))}

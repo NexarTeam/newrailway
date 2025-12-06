@@ -82,5 +82,23 @@
     "userId": "1f5ade16-c5f9-4bb7-a7ce-7aef1e78b76e",
     "achievementId": "first_login",
     "unlockedAt": "2025-12-06T18:40:50.240Z"
+  },
+  {
+    "id": "8e8b184f-265a-4ae4-b48f-be5987a800a6",
+    "userId": "ad4e3732-0f7e-416b-ae17-b35ec42e20c2",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T23:03:46.416Z"
+  },
+  {
+    "id": "5dda51e5-813c-4e2f-bf44-48f01e87e916",
+    "userId": "492a5e56-9652-4066-8afb-1ce8a558ff82",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T23:09:08.217Z"
+  },
+  {
+    "id": "e132bf4f-31ec-4b64-8c04-138d06ba3c55",
+    "userId": "e727a32c-88e2-46b6-b872-e19604ad0605",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T23:14:32.029Z"
   }
 ]
