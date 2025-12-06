@@ -138,7 +138,6 @@ export default function StorePage({
     try {
       const result = await post<{ message: string; balance: number; ownedGames: string[] }>("/api/wallet/purchase-game", {
         gameId: game.id,
-        price: price,
       });
 
       if (result) {

@@ -64,5 +64,11 @@
     "userId": "711b15cf-e5c4-4953-b075-b28fac5ca171",
     "achievementId": "first_friend",
     "unlockedAt": "2025-12-06T16:29:12.157Z"
+  },
+  {
+    "id": "2ee5b62f-9d87-4934-a36b-6e3d1cfb4601",
+    "userId": "2f96c987-eb80-4b39-83e0-ae6ea19b597b",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T18:14:31.892Z"
   }
 ]

@@ -146,6 +146,17 @@ const ACHIEVEMENTS_LIST = [
   { id: "developer", name: "Developer", description: "Have a game approved for the Nexar Store", icon: "code" },
 ];
 
+const GAME_CATALOG: Record<string, { price: number; name: string }> = {
+  "store-1": { price: 49.99, name: "Cyber Legends" },
+  "store-2": { price: 59.99, name: "Dragon's Quest" },
+  "store-3": { price: 29.99, name: "Speed Racer" },
+  "store-4": { price: 39.99, name: "Mystery Manor" },
+  "store-5": { price: 69.99, name: "Galactic Wars" },
+  "store-6": { price: 24.99, name: "Puzzle Master" },
+  "store-7": { price: 34.99, name: "Sports Champions" },
+  "store-8": { price: 44.99, name: "Adventure Time" },
+};
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -992,11 +1003,19 @@ export async function registerRoutes(
 
   app.post("/api/wallet/purchase-game", authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
-      const { gameId, price, gameName } = req.body;
+      const { gameId } = req.body;
       
-      if (!gameId || price === undefined || !gameName) {
-        return res.status(400).json({ message: "Game ID, price, and name are required" });
+      if (!gameId) {
+        return res.status(400).json({ message: "Game ID is required" });
       }
+
+      const gameData = GAME_CATALOG[gameId];
+      if (!gameData) {
+        return res.status(404).json({ message: "Game not found in catalog" });
+      }
+
+      const canonicalPrice = gameData.price;
+      const gameName = gameData.name;
 
       const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
       if (!user) {
@@ -1007,11 +1026,11 @@ export async function registerRoutes(
         return res.status(400).json({ message: "You already own this game" });
       }
 
-      if ((user.walletBalance || 0) < price) {
+      if ((user.walletBalance || 0) < canonicalPrice) {
         return res.status(400).json({ message: "Insufficient wallet balance" });
       }
 
-      const newBalance = (user.walletBalance || 0) - price;
+      const newBalance = (user.walletBalance || 0) - canonicalPrice;
       const newOwnedGames = [...(user.ownedGames || []), gameId];
       
       updateOne<User>("users.json", (u) => u.id === user.id, { 
@@ -1023,7 +1042,7 @@ export async function registerRoutes(
         id: uuidv4(),
         userId: user.id,
         type: "purchase",
-        amount: -price,
+        amount: -canonicalPrice,
         description: `Purchased ${gameName}`,
         gameId,
         timestamp: new Date().toISOString(),
