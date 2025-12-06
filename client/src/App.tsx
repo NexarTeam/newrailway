@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { useLocation } from "wouter";
 import { AnimatePresence, motion } from "framer-motion";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -6,7 +7,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Loader2 } from "lucide-react";
 
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import NexarSidebar, { type NavPage } from "@/components/nexar/NexarSidebar";
 import GameDetailsModal from "@/components/nexar/GameDetailsModal";
 import UpdateChecker from "@/components/nexar/UpdateChecker";
@@ -19,6 +22,13 @@ import StorePage from "@/pages/StorePage";
 import DownloadsPage from "@/pages/DownloadsPage";
 import SettingsPage from "@/pages/SettingsPage";
 import SteamImportPage from "@/pages/SteamImportPage";
+import LoginPage from "@/pages/LoginPage";
+import RegisterPage from "@/pages/RegisterPage";
+import ProfilePage from "@/pages/ProfilePage";
+import FriendsPage from "@/pages/FriendsPage";
+import MessagesPage from "@/pages/MessagesPage";
+import AchievementsPage from "@/pages/AchievementsPage";
+import CloudSavesPage from "@/pages/CloudSavesPage";
 
 const mockLibraryGames: Game[] = [
   { id: "lib-1", title: "Cyber Assault 2087", isInstalled: true, playTime: 245, size: "45.2 GB", genre: "Action RPG", rating: 4.5 },
@@ -46,8 +56,28 @@ const mockFeaturedGames: Game[] = [
   { id: "feat-3", title: "Phantom Strike", genre: "Tactical Shooter", isInstalled: true, rating: 4.7 },
 ];
 
+function AuthWrapper({ children }: { children: React.ReactNode }) {
+  const { isLoading, isAuthenticated } = useAuth();
+  const [location] = useLocation();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#000000] flex items-center justify-center">
+        <Loader2 className="w-10 h-10 animate-spin text-[#d00024]" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return location === "/register" ? <RegisterPage /> : <LoginPage />;
+  }
+
+  return <>{children}</>;
+}
+
 function NexarOS() {
   const { toast } = useToast();
+  const { user, logout } = useAuth();
   const [currentPage, setCurrentPage] = useState<NavPage>("home");
   const [libraryGames, setLibraryGames] = useState<Game[]>(mockLibraryGames);
   const [downloads, setDownloads] = useState<DownloadInfo[]>([
@@ -236,6 +266,16 @@ function NexarOS() {
         return <SettingsPage />;
       case "steam-import":
         return <SteamImportPage onImport={handleSteamImport} />;
+      case "profile":
+        return <ProfilePage />;
+      case "friends":
+        return <FriendsPage />;
+      case "messages":
+        return <MessagesPage />;
+      case "achievements":
+        return <AchievementsPage />;
+      case "cloud":
+        return <CloudSavesPage />;
       default:
         return null;
     }
@@ -247,6 +287,8 @@ function NexarOS() {
         currentPage={currentPage}
         onNavigate={setCurrentPage}
         downloadCount={activeDownloadCount}
+        user={user ? { username: user.username, avatarUrl: user.avatarUrl } : null}
+        onLogout={logout}
       />
 
       <main className="flex-1 overflow-hidden">
@@ -288,8 +330,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <NexarOS />
+        <AuthProvider>
+          <Toaster />
+          <AuthWrapper>
+            <NexarOS />
+          </AuthWrapper>
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

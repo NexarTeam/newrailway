@@ -1,1 +1,20 @@
-[]
+[
+  {
+    "id": "8f873b6d-12eb-48c9-9b46-008983825147",
+    "email": "test@test.com",
+    "username": "testuser",
+    "passwordHash": "$2b$10$epAKWCKQ5Rr/z/Y2l4GWDu8O1mTNgtlH6i8NnT8raZ6FZMC80GZl.",
+    "avatarUrl": "",
+    "bio": "",
+    "createdAt": "2025-12-06T12:39:51.494Z"
+  },
+  {
+    "id": "3c402b53-e99b-4e45-b8b6-991e843ac0f0",
+    "email": "A3TuMc@test.com",
+    "username": "testusernlD6LT",
+    "passwordHash": "$2b$10$teHj23xX7XyX/BB/1G8hAu5O/9Go64jSGzt5AGH2sy0j8YczxsWzO",
+    "avatarUrl": "",
+    "bio": "",
+    "createdAt": "2025-12-06T12:44:00.308Z"
+  }
+]

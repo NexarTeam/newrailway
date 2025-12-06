@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "id": "75e217c2-a3c4-4862-86c9-6518b6a8c88f",
+    "userId": "8f873b6d-12eb-48c9-9b46-008983825147",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T12:39:51.495Z"
+  },
+  {
+    "id": "fe9d621b-0c30-4a85-b58f-5c8c821bc249",
+    "userId": "3c402b53-e99b-4e45-b8b6-991e843ac0f0",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T12:44:00.310Z"
+  }
+]
