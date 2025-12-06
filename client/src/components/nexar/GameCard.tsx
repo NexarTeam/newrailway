@@ -14,7 +14,6 @@ export interface Game {
   title: string;
   coverUrl?: string;
   isInstalled: boolean;
-  isSteam?: boolean;
   playTime?: number;
   size?: string;
   rating?: number;
@@ -129,12 +128,6 @@ export default function GameCard({
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
         
-        {game.isSteam && (
-          <Badge className="absolute top-2 left-2 bg-blue-600 text-white text-xs">
-            Steam
-          </Badge>
-        )}
-
         {isDownloading && (
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted">
             <div 

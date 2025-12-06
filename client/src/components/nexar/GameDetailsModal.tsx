@@ -77,9 +77,6 @@ export default function GameDetailsModal({
               <div className="flex-1 p-6 space-y-6 overflow-y-auto max-h-[60vh] md:max-h-[80vh]">
                 <div>
                   <div className="flex flex-wrap items-center gap-2 mb-2">
-                    {game.isSteam && (
-                      <Badge className="bg-blue-600 text-white">Steam</Badge>
-                    )}
                     {game.genre && (
                       <Badge variant="secondary">{game.genre}</Badge>
                     )}

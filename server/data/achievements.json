@@ -34,5 +34,11 @@
     "userId": "df9f6fcf-7149-4326-88c7-ccffe1775c32",
     "achievementId": "first_login",
     "unlockedAt": "2025-12-06T15:29:41.243Z"
+  },
+  {
+    "id": "bd1f1a67-6573-4d8f-b1d0-60abc05815d0",
+    "userId": "092544e1-34f0-4578-b222-ea6b9f5b0199",
+    "achievementId": "cloud_saver",
+    "unlockedAt": "2025-12-06T15:36:29.709Z"
   }
 ]

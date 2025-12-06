@@ -1,11 +1,11 @@
 import { motion } from "framer-motion";
-import { Home, Library, ShoppingBag, Download, Settings, Upload, Gamepad2, User, Users, MessageCircle, Trophy, Cloud, LogOut } from "lucide-react";
+import { Home, Library, ShoppingBag, Download, Settings, Gamepad2, User, Users, MessageCircle, Trophy, Cloud, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import NexarLogo from "./NexarLogo";
 
-export type NavPage = "home" | "library" | "store" | "downloads" | "settings" | "steam-import" | "profile" | "friends" | "messages" | "achievements" | "cloud";
+export type NavPage = "home" | "library" | "store" | "downloads" | "settings" | "profile" | "friends" | "messages" | "achievements" | "cloud";
 
 interface NexarSidebarProps {
   currentPage: NavPage;
@@ -31,7 +31,6 @@ const nexarIdItems: { id: NavPage; label: string; icon: typeof Home }[] = [
 ];
 
 const settingsItems: { id: NavPage; label: string; icon: typeof Home }[] = [
-  { id: "steam-import", label: "Steam Import", icon: Upload },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 

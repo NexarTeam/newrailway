@@ -1,0 +1,117 @@
+You are now updating NexarOS to remove ALL Steam integration and convert the system into a fully standalone Nexar-only gaming platform.
+
+Perform the following changes across the entire codebase (frontend + backend):
+
+=====================================================
+            🚫 REMOVE ALL STEAM INTEGRATION
+=====================================================
+
+Remove completely:
+- Steam library scanning
+- Steam folder detection
+- VDF (Steam config) parsing
+- Steam install path lookup logic
+- Steam API presence or usage
+- Steam achievements
+- Steam friends or session handling
+- Steam-related metadata structures
+- Steam UI tiles, filters, or import buttons
+- Any Steam-specific routes or services in the backend
+
+Files to modify:
+- All backend routes that reference Steam
+- Any helpers or utils related to Steam
+- Library service functions that import from Steam
+- Frontend components for Steam sections
+- Settings or Library pages referencing Steam
+- UI elements like “Import Steam Library,” “Open Steam,” or Steam icons
+
+If any Steam-related code is tightly coupled or blocking, safely refactor or delete the related blocks and restructure the system to function WITHOUT Steam.
+
+=====================================================
+            🟦 REPLACE WITH NEXAR-ONLY SYSTEMS
+=====================================================
+
+Replace removed Steam features with a clean Nexar-only structure:
+
+1. Nexar Game Manifest Format
+   Instead of reading Steam data, create a manifest format:
+   {
+     "id": "string",
+     "title": "string",
+     "executable": "string",
+     "installDir": "string",
+     "coverArt": "string",
+     "description": "string",
+     "tags": ["Action", "Indie", ...]
+   }
+
+2. Nexar Library Management
+   Rewrite the library backend so it reads/writes ONLY Nexar game manifests
+   stored in something like /backend/data/library.json.
+
+3. Nexar Installer Simulation
+   Keep the current "install game" simulation but make it use the new Nexar
+   manifest format instead of Steam app IDs.
+
+4. Nexar Game Launcher Hook
+   Create a placeholder launcher function:
+   launchGame(gameId) → prepares for the future Electron bridge.
+   In Replit, simulate the launch action.
+
+5. Nexar Store Integration
+   Update the Store page to reference Nexar’s game metadata only.
+   No Steam categories, tags, or store links.
+
+6. Nexar Achievements
+   Ensure the system uses ONLY Nexar’s own achievement model.
+
+7. Nexar Friends & Invites
+   Confirm the social system is entirely independent from Steam.
+
+=====================================================
+            🧹 CLEANUP & FIXES
+=====================================================
+
+After removal:
+- Ensure no unused imports remain.
+- Remove any dead code or logs referencing Steam.
+- Fix all broken references or undefined variables.
+- Verify that the Library and Store pages load correctly.
+- Confirm that adding/removing/listing games works normally.
+- Ensure Settings no longer include Steam options.
+- Update navigation so Steam is not referenced anywhere.
+
+=====================================================
+            🎨 UI / UX IMPROVEMENTS
+=====================================================
+
+Update UI so NexarOS feels like its own premium ecosystem:
+
+- Replace any Steam icons with Nexar branding.
+- Update empty-library state:
+  “Your Nexar Library is empty. Install games from the Nexar Store.”
+- Update Settings wording for Nexar-only platform.
+- Enhance Library cards to use your red/dark theme.
+
+=====================================================
+                🧪 FINAL VALIDATION
+=====================================================
+
+Before finishing, run a full internal audit:
+
+1. Can a user:
+   - Login
+   - Install a Nexar game
+   - See it in the library
+   - Launch it (simulated)
+   - Manage profile/settings
+   - Use friends/messages
+   - Use achievements & cloud features
+
+2. Confirm that NO Steam code, UI, imports, comments, or artifacts remain anywhere.
+
+Return all modified files with complete working code.
+
+=====================================================
+Begin the full refactor now.

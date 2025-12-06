@@ -28,7 +28,7 @@ export default function LibraryPage({
 }: LibraryPageProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [filter, setFilter] = useState<"all" | "installed" | "steam">("all");
+  const [filter, setFilter] = useState<"all" | "installed">("all");
   const [sortBy, setSortBy] = useState<"name" | "recent" | "playtime">("recent");
 
   const filteredGames = useMemo(() => {
@@ -42,8 +42,6 @@ export default function LibraryPage({
 
     if (filter === "installed") {
       result = result.filter(g => g.isInstalled);
-    } else if (filter === "steam") {
-      result = result.filter(g => g.isSteam);
     }
 
     if (sortBy === "name") {
@@ -107,7 +105,6 @@ export default function LibraryPage({
           <TabsList>
             <TabsTrigger value="all" data-testid="tab-all">All Games</TabsTrigger>
             <TabsTrigger value="installed" data-testid="tab-installed">Installed</TabsTrigger>
-            <TabsTrigger value="steam" data-testid="tab-steam">Steam</TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -139,7 +136,7 @@ export default function LibraryPage({
             <p className="text-muted-foreground">
               {searchQuery 
                 ? "Try adjusting your search or filters" 
-                : "Your library is empty. Visit the store to get some games!"}
+                : "Your Nexar Library is empty. Install games from the Nexar Store."}
             </p>
           </motion.div>
         ) : viewMode === "grid" ? (

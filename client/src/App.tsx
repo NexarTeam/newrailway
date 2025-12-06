@@ -22,7 +22,6 @@ import LibraryPage from "@/pages/LibraryPage";
 import StorePage from "@/pages/StorePage";
 import DownloadsPage from "@/pages/DownloadsPage";
 import SettingsPage from "@/pages/SettingsPage";
-import SteamImportPage from "@/pages/SteamImportPage";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
 import ProfilePage from "@/pages/ProfilePage";
@@ -171,14 +170,6 @@ function NexarOS() {
     setSelectedGame(game);
   }, []);
 
-  const handleSteamImport = useCallback((games: Game[]) => {
-    setLibraryGames(prev => [...prev, ...games]);
-    toast({
-      title: "Steam Library Imported",
-      description: `${games.length} games have been added to your library`,
-    });
-    setCurrentPage("library");
-  }, [toast]);
 
   const handlePauseDownload = useCallback((download: DownloadInfo) => {
     setDownloads(prev => prev.map(d => 
@@ -265,8 +256,6 @@ function NexarOS() {
         );
       case "settings":
         return <SettingsPage />;
-      case "steam-import":
-        return <SteamImportPage onImport={handleSteamImport} />;
       case "profile":
         return <ProfilePage />;
       case "friends":

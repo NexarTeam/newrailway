@@ -35,7 +35,7 @@ export default function UpdateChecker({
       size: "245 MB",
       changelog: [
         "Improved game library performance",
-        "Added new Steam integration features", 
+        "Enhanced Nexar Store features", 
         "Enhanced download manager",
         "Fixed various UI bugs"
       ]
