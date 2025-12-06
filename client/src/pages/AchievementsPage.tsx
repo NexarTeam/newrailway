@@ -9,6 +9,7 @@ import socialButterflyImage from "@assets/social_butterfly_ach_(1)_1765040235877
 import firstLoginImage from "@assets/first_login_ach_(1)_1765040378073.png";
 import developerImage from "@assets/developer_ach_(1)_1765040424106.png";
 import messengerImage from "@assets/messenger_ach_(1)_1765040734815.png";
+import chatMasterImage from "@assets/chat_master_ach_(1)_1765041253777.png";
 
 const achievementImageMap: Record<string, string> = {
   first_friend: firstFriendImage,
@@ -16,6 +17,7 @@ const achievementImageMap: Record<string, string> = {
   first_login: firstLoginImage,
   developer: developerImage,
   messenger: messengerImage,
+  chat_master: chatMasterImage,
 };
 
 interface Achievement {
