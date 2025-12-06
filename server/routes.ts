@@ -126,7 +126,6 @@ const ACHIEVEMENTS_LIST = [
   { id: "messenger", name: "Messenger", description: "Send your first message", icon: "message-circle" },
   { id: "social_butterfly", name: "Social Butterfly", description: "Have 5 friends", icon: "heart" },
   { id: "chat_master", name: "Chat Master", description: "Send 50 messages", icon: "messages-square" },
-  { id: "data_hoarder", name: "Data Hoarder", description: "Upload 10 cloud saves", icon: "database" },
   { id: "developer", name: "Developer", description: "Have a game approved for the Nexar Store", icon: "code" },
 ];
 
@@ -739,27 +738,8 @@ export async function registerRoutes(
 
     insertOne("cloud_saves.json", cloudSave);
 
-    const unlockedAchievements: typeof ACHIEVEMENTS_LIST = [];
-    const userSaves = findMany<CloudSave>("cloud_saves.json", (s) => s.userId === userId);
-
-    if (userSaves.length >= 10) {
-      const existing = findOne<UserAchievement>("achievements.json",
-        (a) => a.userId === userId && a.achievementId === "data_hoarder"
-      );
-      if (!existing) {
-        insertOne<UserAchievement>("achievements.json", {
-          id: uuidv4(),
-          userId,
-          achievementId: "data_hoarder",
-          unlockedAt: new Date().toISOString(),
-        });
-        const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "data_hoarder");
-        if (achievement) unlockedAchievements.push(achievement);
-      }
-    }
-
     const { data: _, ...saveWithoutData } = cloudSave;
-    res.status(201).json({ ...saveWithoutData, unlockedAchievements });
+    res.status(201).json(saveWithoutData);
   });
 
   app.patch("/api/cloud/:saveId", authMiddleware, (req: AuthenticatedRequest, res) => {
