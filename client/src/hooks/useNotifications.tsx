@@ -1,8 +1,27 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Trophy, MessageCircle, X } from "lucide-react";
+
+interface Message {
+  id: string;
+  fromId: string;
+  toId: string;
+  text: string;
+  timestamp: string;
+}
+
+interface ConversationPartner {
+  id: string;
+  username: string;
+  avatarUrl: string;
+}
+
+interface Conversation {
+  partner: ConversationPartner;
+  lastMessage: Message | null;
+}
 
 interface BaseNotification {
   id: string;
@@ -47,11 +66,33 @@ export function useNotifications() {
 
 interface NotificationProviderProps {
   children: ReactNode;
+  userId?: string | null;
+  token?: string | null;
 }
 
-export function NotificationProvider({ children }: NotificationProviderProps) {
+const POLLING_INTERVAL = 15000; // 15 seconds
+
+function decodeJwtPayload(token: string): { userId?: string } | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, "=");
+    const decoded = atob(padded);
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+}
+
+export function NotificationProvider({ children, userId, token }: NotificationProviderProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  const seenMessageIds = useRef<Set<string>>(new Set());
+  const lastPollTime = useRef<number>(Date.now());
+  const isInitialized = useRef(false);
+  const prevUserIdRef = useRef<string | null | undefined>(null);
 
   const dismissNotification = useCallback((id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
@@ -94,6 +135,73 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
     };
     addNotification(notification);
   }, [addNotification]);
+
+  useEffect(() => {
+    if (prevUserIdRef.current !== userId) {
+      seenMessageIds.current.clear();
+      lastPollTime.current = Date.now();
+      isInitialized.current = false;
+      prevUserIdRef.current = userId;
+    }
+
+    if (!token || !userId) {
+      return;
+    }
+
+    const isOnMessagesPage = location === "/messages";
+    const currentUserId = userId;
+
+    const pollMessages = async () => {
+      try {
+        const response = await fetch("/api/messages/conversations", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        if (!response.ok) return;
+        
+        const conversations: Conversation[] = await response.json();
+        
+        for (const conv of conversations) {
+          const lastMsg = conv.lastMessage;
+          if (!lastMsg) continue;
+          
+          if (lastMsg.fromId === currentUserId) continue;
+          
+          if (seenMessageIds.current.has(lastMsg.id)) continue;
+          
+          seenMessageIds.current.add(lastMsg.id);
+          
+          if (!isInitialized.current) continue;
+          
+          const msgTime = new Date(lastMsg.timestamp).getTime();
+          if (msgTime < lastPollTime.current) continue;
+          
+          if (!isOnMessagesPage) {
+            addNotification({
+              id: `message-${lastMsg.id}`,
+              type: "message",
+              senderId: conv.partner.id,
+              senderUsername: conv.partner.username,
+              senderAvatar: conv.partner.avatarUrl,
+              preview: lastMsg.text.substring(0, 100),
+              createdAt: Date.now(),
+            });
+          }
+        }
+        
+        lastPollTime.current = Date.now();
+        isInitialized.current = true;
+      } catch (error) {
+        console.error("Failed to poll messages:", error);
+      }
+    };
+
+    pollMessages();
+
+    const intervalId = setInterval(pollMessages, POLLING_INTERVAL);
+
+    return () => clearInterval(intervalId);
+  }, [location, addNotification, token, userId]);
 
   const handleNotificationClick = (notification: Notification) => {
     dismissNotification(notification.id);

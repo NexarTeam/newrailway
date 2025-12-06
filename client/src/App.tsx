@@ -327,17 +327,26 @@ function NexarOS() {
   );
 }
 
+function NotificationWrapper({ children }: { children: React.ReactNode }) {
+  const { user, token } = useAuth();
+  return (
+    <NotificationProvider userId={user?.id} token={token}>
+      {children}
+    </NotificationProvider>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <NotificationProvider>
+          <NotificationWrapper>
             <Toaster />
             <AuthWrapper>
               <NexarOS />
             </AuthWrapper>
-          </NotificationProvider>
+          </NotificationWrapper>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
