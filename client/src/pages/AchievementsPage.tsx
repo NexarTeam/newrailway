@@ -5,9 +5,11 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Trophy, User, Users, MessageCircle, Cloud, Heart, MessagesSquare, Database, Lock } from "lucide-react";
 
 import firstFriendImage from "@assets/first_friend_ach_(1)_1765039658293.png";
+import socialButterflyImage from "@assets/social_butterfly_ach_(1)_1765040235877.png";
 
 const achievementImageMap: Record<string, string> = {
   first_friend: firstFriendImage,
+  social_butterfly: socialButterflyImage,
 };
 
 interface Achievement {
@@ -107,7 +109,7 @@ export default function AchievementsPage() {
                     <img 
                       src={achievementImageMap[achievement.id]} 
                       alt={achievement.name}
-                      className={`w-20 h-20 flex-shrink-0 object-contain ${
+                      className={`w-24 h-24 flex-shrink-0 object-contain ${
                         !achievement.unlocked && "opacity-40 grayscale"
                       }`}
                     />

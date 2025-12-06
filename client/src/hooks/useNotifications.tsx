@@ -5,9 +5,11 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Trophy, MessageCircle, X } from "lucide-react";
 
 import firstFriendImage from "@assets/first_friend_ach_(1)_1765039658293.png";
+import socialButterflyImage from "@assets/social_butterfly_ach_(1)_1765040235877.png";
 
 const achievementImageMap: Record<string, string> = {
   first_friend: firstFriendImage,
+  social_butterfly: socialButterflyImage,
 };
 
 interface Message {
@@ -251,7 +253,7 @@ export function NotificationProvider({ children, userId, token }: NotificationPr
                       <img 
                         src={achievementImageMap[notification.achievementId]} 
                         alt={notification.name}
-                        className="flex-shrink-0 w-14 h-14 object-contain"
+                        className="flex-shrink-0 w-16 h-16 object-contain"
                       />
                     ) : (
                       <div className="flex-shrink-0 w-12 h-12 rounded-full bg-[#d00024]/20 border border-[#d00024]/50 flex items-center justify-center">
