@@ -1,13 +1,20 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Monitor, Wifi, HardDrive, Info, Palette, Zap, Shield, Bell, Cpu, MonitorSmartphone, Server } from "lucide-react";
+import { Monitor, Wifi, HardDrive, Info, Palette, Zap, Shield, Bell, Cpu, MonitorSmartphone, Server, Clock, ShoppingCart, Lock, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { useQuery } from "@tanstack/react-query";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface SystemInfo {
   version: string;
@@ -23,7 +30,19 @@ interface SystemInfo {
   };
 }
 
-type SettingsTab = "display" | "performance" | "network" | "storage" | "notifications" | "system";
+interface ParentalStatus {
+  enabled: boolean;
+  playtimeLimit: number | null;
+  canMakePurchases: boolean;
+  restrictedRatings: string[];
+  requiresParentApproval: boolean;
+  dailyPlaytimeLog: {
+    date: string;
+    minutesPlayed: number;
+  };
+}
+
+type SettingsTab = "display" | "performance" | "network" | "storage" | "notifications" | "parental" | "system";
 
 const tabs: { id: SettingsTab; label: string; icon: typeof Monitor }[] = [
   { id: "display", label: "Display", icon: Monitor },
@@ -31,14 +50,22 @@ const tabs: { id: SettingsTab; label: string; icon: typeof Monitor }[] = [
   { id: "network", label: "Network", icon: Wifi },
   { id: "storage", label: "Storage", icon: HardDrive },
   { id: "notifications", label: "Notifications", icon: Bell },
+  { id: "parental", label: "Parental Controls", icon: Shield },
   { id: "system", label: "System", icon: Info },
 ];
 
+const CONTENT_RATINGS = ["7+", "12+", "16+", "18+", "Mature"];
+
 export default function SettingsPanel() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("display");
+  const { toast } = useToast();
   
   const { data: systemInfo, isLoading: systemLoading } = useQuery<SystemInfo>({
     queryKey: ["/api/system/info"],
+  });
+
+  const { data: parentalStatus, isLoading: parentalLoading, refetch: refetchParental } = useQuery<ParentalStatus>({
+    queryKey: ["/api/parental/status"],
   });
 
   const [settings, setSettings] = useState({
@@ -55,8 +82,110 @@ export default function SettingsPanel() {
     volume: [70],
   });
 
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [pinModalType, setPinModalType] = useState<"enable" | "disable" | "settings">("enable");
+  const [pinInput, setPinInput] = useState("");
+  const [confirmPinInput, setConfirmPinInput] = useState("");
+  const [pendingSettings, setPendingSettings] = useState<Partial<ParentalStatus>>({});
+
+  const enableParentalMutation = useMutation({
+    mutationFn: async (pin: string) => {
+      const res = await apiRequest("POST", "/api/parental/enable", { pin });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Parental Controls Enabled", description: "PIN has been set successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/parental/status"] });
+      setPinModalOpen(false);
+      setPinInput("");
+      setConfirmPinInput("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const disableParentalMutation = useMutation({
+    mutationFn: async (pin: string) => {
+      const res = await apiRequest("POST", "/api/parental/disable", { pin });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Parental Controls Disabled" });
+      queryClient.invalidateQueries({ queryKey: ["/api/parental/status"] });
+      setPinModalOpen(false);
+      setPinInput("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: async ({ pin, ...settings }: { pin: string } & Partial<ParentalStatus>) => {
+      const res = await apiRequest("POST", "/api/parental/updateSettings", { pin, ...settings });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Settings Updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/parental/status"] });
+      setPinModalOpen(false);
+      setPinInput("");
+      setPendingSettings({});
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const updateSetting = (key: string, value: unknown) => {
     setSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleEnableParental = () => {
+    setPinModalType("enable");
+    setPinInput("");
+    setConfirmPinInput("");
+    setPinModalOpen(true);
+  };
+
+  const handleDisableParental = () => {
+    setPinModalType("disable");
+    setPinInput("");
+    setPinModalOpen(true);
+  };
+
+  const handleUpdateSettings = (newSettings: Partial<ParentalStatus>) => {
+    setPendingSettings(newSettings);
+    setPinModalType("settings");
+    setPinInput("");
+    setPinModalOpen(true);
+  };
+
+  const handlePinSubmit = () => {
+    if (pinModalType === "enable") {
+      if (pinInput.length < 4 || pinInput.length > 8 || !/^\d+$/.test(pinInput)) {
+        toast({ title: "Invalid PIN", description: "PIN must be 4-8 digits", variant: "destructive" });
+        return;
+      }
+      if (pinInput !== confirmPinInput) {
+        toast({ title: "PINs don't match", description: "Please confirm your PIN", variant: "destructive" });
+        return;
+      }
+      enableParentalMutation.mutate(pinInput);
+    } else if (pinModalType === "disable") {
+      disableParentalMutation.mutate(pinInput);
+    } else if (pinModalType === "settings") {
+      updateSettingsMutation.mutate({ pin: pinInput, ...pendingSettings });
+    }
+  };
+
+  const formatMinutes = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours === 0) return `${mins}m`;
+    if (mins === 0) return `${hours}h`;
+    return `${hours}h ${mins}m`;
   };
 
   return (
@@ -342,6 +471,186 @@ export default function SettingsPanel() {
             </>
           )}
 
+          {activeTab === "parental" && (
+            <>
+              <div>
+                <h2 className="text-xl font-semibold text-foreground mb-1">Parental Controls</h2>
+                <p className="text-sm text-muted-foreground">Manage content and playtime restrictions</p>
+              </div>
+
+              {parentalLoading ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-muted-foreground text-center">Loading parental controls...</p>
+                  </CardContent>
+                </Card>
+              ) : !parentalStatus?.enabled ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Shield className="w-5 h-5 text-primary" />
+                      Enable Parental Controls
+                    </CardTitle>
+                    <CardDescription>
+                      Set up parental controls to restrict content, limit playtime, and control purchases.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button onClick={handleEnableParental} data-testid="button-enable-parental">
+                      <Lock className="w-4 h-4 mr-2" />
+                      Enable Parental Controls
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Clock className="w-5 h-5 text-primary" />
+                        Daily Activity
+                      </CardTitle>
+                      <CardDescription>Today's playtime statistics</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Time Played Today</span>
+                        <span className="font-medium text-foreground" data-testid="text-playtime-today">
+                          {formatMinutes(parentalStatus.dailyPlaytimeLog?.minutesPlayed || 0)}
+                        </span>
+                      </div>
+                      {parentalStatus.playtimeLimit && (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Daily Limit</span>
+                            <span className="font-medium text-foreground" data-testid="text-playtime-limit">
+                              {formatMinutes(parentalStatus.playtimeLimit)}
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Remaining</span>
+                              <span className="text-foreground">
+                                {formatMinutes(Math.max(0, parentalStatus.playtimeLimit - (parentalStatus.dailyPlaytimeLog?.minutesPlayed || 0)))}
+                              </span>
+                            </div>
+                            <Progress 
+                              value={Math.min(100, ((parentalStatus.dailyPlaytimeLog?.minutesPlayed || 0) / parentalStatus.playtimeLimit) * 100)} 
+                              className="h-2" 
+                            />
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Clock className="w-5 h-5 text-primary" />
+                        Playtime Limit
+                      </CardTitle>
+                      <CardDescription>Set daily playtime restrictions</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Select 
+                        value={parentalStatus.playtimeLimit?.toString() || "none"}
+                        onValueChange={(v) => handleUpdateSettings({ playtimeLimit: v === "none" ? null : parseInt(v) })}
+                        data-testid="select-playtime-limit"
+                      >
+                        <SelectTrigger data-testid="trigger-playtime-limit">
+                          <SelectValue placeholder="Select limit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No Limit</SelectItem>
+                          <SelectItem value="30">30 minutes/day</SelectItem>
+                          <SelectItem value="60">1 hour/day</SelectItem>
+                          <SelectItem value="120">2 hours/day</SelectItem>
+                          <SelectItem value="180">3 hours/day</SelectItem>
+                          <SelectItem value="240">4 hours/day</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5 text-primary" />
+                        Content Restrictions
+                      </CardTitle>
+                      <CardDescription>Block games by age rating</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {CONTENT_RATINGS.map((rating) => (
+                        <div key={rating} className="flex items-center space-x-3">
+                          <Checkbox 
+                            id={`rating-${rating}`}
+                            checked={parentalStatus.restrictedRatings?.includes(rating)}
+                            onCheckedChange={(checked) => {
+                              const newRatings = checked
+                                ? [...(parentalStatus.restrictedRatings || []), rating]
+                                : (parentalStatus.restrictedRatings || []).filter((r) => r !== rating);
+                              handleUpdateSettings({ restrictedRatings: newRatings });
+                            }}
+                            data-testid={`checkbox-rating-${rating}`}
+                          />
+                          <Label htmlFor={`rating-${rating}`} className="text-foreground cursor-pointer">
+                            Block {rating} content
+                          </Label>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <ShoppingCart className="w-5 h-5 text-primary" />
+                        Purchase Settings
+                      </CardTitle>
+                      <CardDescription>Control buying permissions</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-foreground">Allow Purchases</p>
+                          <p className="text-sm text-muted-foreground">Enable buying games and add-ons</p>
+                        </div>
+                        <Switch 
+                          checked={parentalStatus.canMakePurchases}
+                          onCheckedChange={(v) => handleUpdateSettings({ canMakePurchases: v })}
+                          data-testid="switch-allow-purchases"
+                        />
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-foreground">Require Parent Approval</p>
+                          <p className="text-sm text-muted-foreground">PIN required for each purchase</p>
+                        </div>
+                        <Switch 
+                          checked={parentalStatus.requiresParentApproval}
+                          onCheckedChange={(v) => handleUpdateSettings({ requiresParentApproval: v })}
+                          data-testid="switch-require-approval"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Button 
+                    variant="destructive" 
+                    onClick={handleDisableParental}
+                    data-testid="button-disable-parental"
+                  >
+                    <Lock className="w-4 h-4 mr-2" />
+                    Disable Parental Controls
+                  </Button>
+                </>
+              )}
+            </>
+          )}
+
           {activeTab === "system" && (
             <>
               <div>
@@ -473,6 +782,69 @@ export default function SettingsPanel() {
           )}
         </motion.div>
       </div>
+
+      <Dialog open={pinModalOpen} onOpenChange={setPinModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {pinModalType === "enable" && "Create Parent PIN"}
+              {pinModalType === "disable" && "Enter Parent PIN"}
+              {pinModalType === "settings" && "Confirm Changes"}
+            </DialogTitle>
+            <DialogDescription>
+              {pinModalType === "enable" && "Create a 4-8 digit PIN to manage parental controls"}
+              {pinModalType === "disable" && "Enter your PIN to disable parental controls"}
+              {pinModalType === "settings" && "Enter your PIN to update settings"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="pin">PIN</Label>
+              <Input
+                id="pin"
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={8}
+                placeholder="Enter PIN"
+                value={pinInput}
+                onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ""))}
+                data-testid="input-pin"
+              />
+            </div>
+            {pinModalType === "enable" && (
+              <div className="space-y-2">
+                <Label htmlFor="confirm-pin">Confirm PIN</Label>
+                <Input
+                  id="confirm-pin"
+                  type="password"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={8}
+                  placeholder="Confirm PIN"
+                  value={confirmPinInput}
+                  onChange={(e) => setConfirmPinInput(e.target.value.replace(/\D/g, ""))}
+                  data-testid="input-confirm-pin"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPinModalOpen(false)} data-testid="button-pin-cancel">
+              Cancel
+            </Button>
+            <Button 
+              onClick={handlePinSubmit} 
+              disabled={enableParentalMutation.isPending || disableParentalMutation.isPending || updateSettingsMutation.isPending}
+              data-testid="button-pin-confirm"
+            >
+              {(enableParentalMutation.isPending || disableParentalMutation.isPending || updateSettingsMutation.isPending) 
+                ? "Processing..." 
+                : "Confirm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

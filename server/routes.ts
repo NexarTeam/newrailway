@@ -80,6 +80,19 @@ const uploadAvatar = multer({
   },
 });
 
+interface ParentalControls {
+  enabled: boolean;
+  parentPin: string;
+  playtimeLimit: number | null;
+  canMakePurchases: boolean;
+  restrictedRatings: string[];
+  requiresParentApproval: boolean;
+  dailyPlaytimeLog: {
+    date: string;
+    minutesPlayed: number;
+  };
+}
+
 interface User {
   id: string;
   email: string;
@@ -94,6 +107,7 @@ interface User {
   ownedGames: string[];
   passwordResetToken?: string;
   passwordResetTokenExpiry?: number;
+  parentalControls?: ParentalControls;
 }
 
 interface WalletTransaction {
@@ -1177,6 +1191,278 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Purchase error:", error);
       res.status(500).json({ message: "Failed to purchase game" });
+    }
+  });
+
+  // ==================== PARENTAL CONTROLS ROUTES ====================
+
+  const getDefaultParentalControls = (): ParentalControls => ({
+    enabled: false,
+    parentPin: "",
+    playtimeLimit: null,
+    canMakePurchases: true,
+    restrictedRatings: [],
+    requiresParentApproval: false,
+    dailyPlaytimeLog: {
+      date: new Date().toISOString().split("T")[0],
+      minutesPlayed: 0,
+    },
+  });
+
+  app.post("/api/parental/enable", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { pin } = req.body;
+
+      if (!pin || typeof pin !== "string" || pin.length < 4 || pin.length > 8 || !/^\d+$/.test(pin)) {
+        return res.status(400).json({ message: "PIN must be 4-8 digits" });
+      }
+
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const hashedPin = await bcrypt.hash(pin, 10);
+      const parentalControls: ParentalControls = {
+        ...getDefaultParentalControls(),
+        enabled: true,
+        parentPin: hashedPin,
+      };
+
+      updateOne<User>("users.json", (u) => u.id === user.id, { parentalControls });
+      res.json({ message: "Parental controls enabled" });
+    } catch (error) {
+      console.error("Enable parental controls error:", error);
+      res.status(500).json({ message: "Failed to enable parental controls" });
+    }
+  });
+
+  app.post("/api/parental/disable", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { pin } = req.body;
+
+      if (!pin) {
+        return res.status(400).json({ message: "PIN is required" });
+      }
+
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user || !user.parentalControls?.enabled) {
+        return res.status(400).json({ message: "Parental controls not enabled" });
+      }
+
+      const validPin = await bcrypt.compare(pin, user.parentalControls.parentPin);
+      if (!validPin) {
+        return res.status(401).json({ message: "Invalid PIN" });
+      }
+
+      updateOne<User>("users.json", (u) => u.id === user.id, { 
+        parentalControls: getDefaultParentalControls() 
+      });
+      res.json({ message: "Parental controls disabled" });
+    } catch (error) {
+      console.error("Disable parental controls error:", error);
+      res.status(500).json({ message: "Failed to disable parental controls" });
+    }
+  });
+
+  app.post("/api/parental/verifyPin", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { pin } = req.body;
+
+      if (!pin) {
+        return res.status(400).json({ valid: false });
+      }
+
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user || !user.parentalControls?.enabled) {
+        return res.status(400).json({ valid: false });
+      }
+
+      const validPin = await bcrypt.compare(pin, user.parentalControls.parentPin);
+      res.json({ valid: validPin });
+    } catch (error) {
+      console.error("Verify PIN error:", error);
+      res.status(500).json({ valid: false });
+    }
+  });
+
+  app.post("/api/parental/updateSettings", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { pin, playtimeLimit, canMakePurchases, restrictedRatings, requiresParentApproval } = req.body;
+
+      if (!pin) {
+        return res.status(400).json({ message: "PIN is required" });
+      }
+
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user || !user.parentalControls?.enabled) {
+        return res.status(400).json({ message: "Parental controls not enabled" });
+      }
+
+      const validPin = await bcrypt.compare(pin, user.parentalControls.parentPin);
+      if (!validPin) {
+        return res.status(401).json({ message: "Invalid PIN" });
+      }
+
+      const updates: Partial<ParentalControls> = {};
+      if (playtimeLimit !== undefined) updates.playtimeLimit = playtimeLimit;
+      if (canMakePurchases !== undefined) updates.canMakePurchases = canMakePurchases;
+      if (restrictedRatings !== undefined) updates.restrictedRatings = restrictedRatings;
+      if (requiresParentApproval !== undefined) updates.requiresParentApproval = requiresParentApproval;
+
+      const newParentalControls = { ...user.parentalControls, ...updates };
+      updateOne<User>("users.json", (u) => u.id === user.id, { parentalControls: newParentalControls });
+      
+      res.json({ message: "Settings updated", parentalControls: newParentalControls });
+    } catch (error) {
+      console.error("Update parental settings error:", error);
+      res.status(500).json({ message: "Failed to update settings" });
+    }
+  });
+
+  app.get("/api/parental/status", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const parentalControls = user.parentalControls || getDefaultParentalControls();
+      
+      const today = new Date().toISOString().split("T")[0];
+      if (parentalControls.dailyPlaytimeLog.date !== today) {
+        parentalControls.dailyPlaytimeLog = { date: today, minutesPlayed: 0 };
+      }
+
+      const { parentPin, ...safeControls } = parentalControls;
+      res.json(safeControls);
+    } catch (error) {
+      console.error("Get parental status error:", error);
+      res.status(500).json({ message: "Failed to get status" });
+    }
+  });
+
+  app.post("/api/parental/checkAccess", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const { gameId, rating } = req.body;
+
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const parentalControls = user.parentalControls;
+      if (!parentalControls?.enabled) {
+        return res.json({ allowed: true });
+      }
+
+      if (rating && parentalControls.restrictedRatings.includes(rating)) {
+        return res.json({ allowed: false, reason: `This game is rated ${rating} which is restricted` });
+      }
+
+      const today = new Date().toISOString().split("T")[0];
+      if (parentalControls.playtimeLimit !== null) {
+        let minutesPlayed = parentalControls.dailyPlaytimeLog.minutesPlayed;
+        if (parentalControls.dailyPlaytimeLog.date !== today) {
+          minutesPlayed = 0;
+        }
+        if (minutesPlayed >= parentalControls.playtimeLimit) {
+          return res.json({ 
+            allowed: false, 
+            reason: `Daily playtime limit of ${parentalControls.playtimeLimit} minutes reached` 
+          });
+        }
+      }
+
+      res.json({ allowed: true });
+    } catch (error) {
+      console.error("Check access error:", error);
+      res.status(500).json({ message: "Failed to check access" });
+    }
+  });
+
+  app.post("/api/parental/override", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { pin } = req.body;
+
+      if (!pin) {
+        return res.status(400).json({ message: "PIN is required" });
+      }
+
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user || !user.parentalControls?.enabled) {
+        return res.status(400).json({ message: "Parental controls not enabled" });
+      }
+
+      const validPin = await bcrypt.compare(pin, user.parentalControls.parentPin);
+      if (!validPin) {
+        return res.status(401).json({ message: "Invalid PIN" });
+      }
+
+      res.json({ allowed: true });
+    } catch (error) {
+      console.error("Override error:", error);
+      res.status(500).json({ message: "Failed to verify override" });
+    }
+  });
+
+  app.post("/api/parental/logPlaytime", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const { minutes } = req.body;
+
+      if (typeof minutes !== "number" || minutes < 0) {
+        return res.status(400).json({ message: "Invalid minutes" });
+      }
+
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const parentalControls = user.parentalControls || getDefaultParentalControls();
+      const today = new Date().toISOString().split("T")[0];
+
+      if (parentalControls.dailyPlaytimeLog.date !== today) {
+        parentalControls.dailyPlaytimeLog = { date: today, minutesPlayed: 0 };
+      }
+
+      parentalControls.dailyPlaytimeLog.minutesPlayed += minutes;
+      updateOne<User>("users.json", (u) => u.id === user.id, { parentalControls });
+
+      res.json({ 
+        minutesPlayed: parentalControls.dailyPlaytimeLog.minutesPlayed,
+        limit: parentalControls.playtimeLimit,
+      });
+    } catch (error) {
+      console.error("Log playtime error:", error);
+      res.status(500).json({ message: "Failed to log playtime" });
+    }
+  });
+
+  app.post("/api/parental/checkPurchase", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const parentalControls = user.parentalControls;
+      if (!parentalControls?.enabled) {
+        return res.json({ allowed: true, requiresApproval: false });
+      }
+
+      if (!parentalControls.canMakePurchases) {
+        return res.json({ allowed: false, reason: "Purchases are disabled by parental controls" });
+      }
+
+      if (parentalControls.requiresParentApproval) {
+        return res.json({ allowed: true, requiresApproval: true });
+      }
+
+      res.json({ allowed: true, requiresApproval: false });
+    } catch (error) {
+      console.error("Check purchase error:", error);
+      res.status(500).json({ message: "Failed to check purchase permission" });
     }
   });
 
