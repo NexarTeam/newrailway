@@ -21,11 +21,13 @@
     "id": "092544e1-34f0-4578-b222-ea6b9f5b0199",
     "email": "harrymb12345@gmail.com",
     "username": "harry12345",
-    "passwordHash": "$2b$10$PaCrpAzLdmC1BNfRv4e21OWxe69pSXbWy0Y.XNjc5cpia234pogYe",
+    "passwordHash": "$2b$10$dRKrqfMhORufdVvDuiqnXuTONqdZJlkjRusEiBmGenoBmFTuxocAm",
     "avatarUrl": "/uploads/avatars/092544e1-34f0-4578-b222-ea6b9f5b0199-1765033799056.png",
     "bio": "SaltCrusader",
     "createdAt": "2025-12-06T13:22:18.143Z",
-    "verified": true
+    "verified": true,
+    "passwordResetToken": "",
+    "passwordResetTokenExpiry": 0
   },
   {
     "id": "50c392ac-b69e-46f5-aceb-16e1dd1ecace",
