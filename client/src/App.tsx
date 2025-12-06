@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2 } from "lucide-react";
 
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { NotificationProvider } from "@/hooks/useNotifications";
 import NexarSidebar, { type NavPage } from "@/components/nexar/NexarSidebar";
 import GameDetailsModal from "@/components/nexar/GameDetailsModal";
 import UpdateChecker from "@/components/nexar/UpdateChecker";
@@ -331,10 +332,12 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <Toaster />
-          <AuthWrapper>
-            <NexarOS />
-          </AuthWrapper>
+          <NotificationProvider>
+            <Toaster />
+            <AuthWrapper>
+              <NexarOS />
+            </AuthWrapper>
+          </NotificationProvider>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
