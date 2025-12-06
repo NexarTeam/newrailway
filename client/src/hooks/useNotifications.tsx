@@ -248,18 +248,11 @@ export function NotificationProvider({ children, userId, token }: NotificationPr
                 {notification.type === "achievement" ? (
                   <>
                     {achievementImageMap[notification.achievementId] ? (
-                      <div 
-                        className="flex-shrink-0 w-12 h-12"
-                        style={{
-                          clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
-                        }}
-                      >
-                        <img 
-                          src={achievementImageMap[notification.achievementId]} 
-                          alt={notification.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
+                      <img 
+                        src={achievementImageMap[notification.achievementId]} 
+                        alt={notification.name}
+                        className="flex-shrink-0 w-12 h-12 object-contain"
+                      />
                     ) : (
                       <div className="flex-shrink-0 w-12 h-12 rounded-full bg-[#d00024]/20 border border-[#d00024]/50 flex items-center justify-center">
                         <Trophy className="w-6 h-6 text-[#d00024]" />
