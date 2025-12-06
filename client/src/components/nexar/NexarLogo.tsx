@@ -28,9 +28,7 @@ export default function NexarLogo({ size = "md", showText = true, className = ""
       />
       {showText && (
         <div className="flex flex-col">
-          <span className="font-mono text-lg font-bold tracking-wider text-foreground">
-            NexarOS
-          </span>
+          <span className="font-mono text-lg font-bold tracking-wider text-foreground">Nexar</span>
           <span className="text-[10px] text-muted-foreground tracking-widest uppercase">
             Sabre Collective
           </span>
