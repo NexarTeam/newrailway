@@ -107,7 +107,7 @@ export default function AchievementsPage() {
                     <img 
                       src={achievementImageMap[achievement.id]} 
                       alt={achievement.name}
-                      className={`w-16 h-16 flex-shrink-0 object-contain ${
+                      className={`w-20 h-20 flex-shrink-0 object-contain ${
                         !achievement.unlocked && "opacity-40 grayscale"
                       }`}
                     />

@@ -251,7 +251,7 @@ export function NotificationProvider({ children, userId, token }: NotificationPr
                       <img 
                         src={achievementImageMap[notification.achievementId]} 
                         alt={notification.name}
-                        className="flex-shrink-0 w-12 h-12 object-contain"
+                        className="flex-shrink-0 w-14 h-14 object-contain"
                       />
                     ) : (
                       <div className="flex-shrink-0 w-12 h-12 rounded-full bg-[#d00024]/20 border border-[#d00024]/50 flex items-center justify-center">
