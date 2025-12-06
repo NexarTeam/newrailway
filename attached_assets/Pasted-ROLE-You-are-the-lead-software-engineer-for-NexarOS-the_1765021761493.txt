@@ -1,0 +1,252 @@
+ROLE:
+You are the lead software engineer for NexarOS, the operating UI for the Nexar handheld gaming console (brand owned by Sabre Collective).
+Your job is to build the entire software stack using Electron + React + Node.js with a dark/red futuristic theme inspired by Xbox/PlayStation UI.
+
+🎮 PROJECT GOALS
+
+Build a complete OS-like launcher called NexarOS with the following core features:
+
+1. Home Screen
+
+Carousel or tile menu
+
+"Continue Playing" section
+
+Quick links: Nexar Games Store, Library, Settings
+
+Animated transitions
+
+Controller-friendly UI (keyboard navigation first; later expanded)
+
+2. Game Library
+
+Reads local directory (C:/NexarGames/)
+
+Lists installed games with cover art
+
+“Play”, “Delete”, “Manage” options
+
+Detects Steam installation automatically
+
+If found, reads Steam library folders
+
+Adds Steam games to library (no deep integration required)
+
+Ability to sort/filter
+
+3. Nexar Games Store
+
+Storefront UI
+
+Pulls from a simple REST API (also built here)
+
+Game cards
+
+Individual game pages
+
+"Install" button → begins download from API
+
+Shows progress, installs to /NexarGames/<title>
+
+4. OTA Update System
+
+Checks a JSON manifest hosted on Replit
+
+If new version exists, prompts user
+
+Handles download + replacing app files (the updater can be simple and handled at app level)
+
+5. Settings Menu
+
+Theme (Dark/Red only now)
+
+Performance profiles (UI only for now)
+
+Network
+
+Account
+
+Storage usage viewer
+
+System info
+
+6. Steam Installer Shortcut
+
+Detect Steam automatically if installed
+
+If not installed, show a “Install Steam” button
+
+Opens official Steam download page (no bundling Steam itself)
+
+🎨 THEME REQUIREMENTS (IMPORTANT)
+
+Use the Nexar color palette consistently:
+
+Primary Background: #000000 or #111111
+
+Secondary Panels: #1A1A1A
+
+Accent Red: #d00024 (or closest neon red)
+
+Text Primary: #EAEAEA
+
+Text Secondary: #A3A3A3
+
+Glow effects: red shadows/glows on hover/focus
+
+Futuristic UI feel (PS5/Xbox hybrid)
+
+🗂 TECH STACK & GUIDELINES
+Frontend
+
+React + Vite
+
+TailwindCSS (strongly preferred)
+
+Framer Motion for animations
+
+Backend (Store + APIs)
+
+Node.js + Express
+
+Simple JSON storage
+
+Endpoints:
+
+/games → list all games
+
+/games/:id → single game
+
+/games/:id/download → provide download file
+
+/updates/latest → OTA manifest
+
+Electron
+
+Build desktop app
+
+Launch React UI
+
+Preload script for interacting with filesystem
+
+Secure IPC
+
+Create an installer (Squirrel or NSIS)
+
+Game Installer Logic
+
+Downloads ZIP archive
+
+Extracts to C:/NexarGames/<game>
+
+Updates local JSON database
+
+Adds to Library automatically
+
+Library Scanner
+
+Recursively scan C:/NexarGames/
+
+For Steam detection:
+
+Check registry (optional)
+
+Check default paths:
+
+C:/Program Files (x86)/Steam/
+
+C:/Program Files/Steam/
+
+Read Steam library folders via libraryfolders.vdf
+
+📦 OUTPUT REQUIREMENTS
+
+Whenever writing code, the AI must provide:
+
+File-by-file output with file paths
+
+Full code for each file
+
+No placeholders unless absolutely necessary
+
+Working build scripts
+
+Clear instructions to run
+
+npm install
+
+npm run dev for frontend
+
+npm run electron for desktop
+
+The agent should always generate production-ready code with comments and consistent styling.
+
+🔧 FOLDER STRUCTURE (AI MUST CREATE THIS)
+/nexaros
+  /app
+    /frontend
+      /src
+        /components
+        /pages
+        /hooks
+        /assets
+      index.html
+      package.json
+      vite.config.js
+
+    /backend
+      /routes
+      /data
+        games.json
+      server.js
+      package.json
+
+  /electron
+    main.js
+    preload.js
+    package.json
+
+  /shared
+    config.json
+    utils.js
+
+🧠 WHAT THE AGENT MUST DO
+
+Write code for every part listed
+
+Auto-generate boilerplate
+
+Style everything using the Nexar theme
+
+Ensure frontend compiles
+
+Ensure backend runs
+
+Ensure Electron can load frontend
+
+Add comments, explanations, and instructions
+
+Provide clear steps for integration
+
+Build all UI pages with animations
+
+🚫 WHAT THE AGENT MUST NOT DO
+
+Do NOT preinstall Steam
+
+Do NOT use copyrighted UI assets
+
+Do NOT include placeholder lorem ipsum beyond short demo text
+
+Do NOT skip files
+
+Do NOT generate partial code unless asked
+
+🎯 PRIMARY OBJECTIVE
+
+Generate a COMPLETE, WORKING starter build of NexarOS (Launcher, Store, Library, Settings, Updater) using the defined architecture and color palette.
+All code must be testable immediately inside Replit.
+
+END OF PROMPT
+
+Build everything exactly as specified.

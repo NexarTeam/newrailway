@@ -1,0 +1,163 @@
+You are building the NexarOS prototype system for the Nexar handheld console.
+Replit cannot run Electron, so you must create a web-based version of NexarOS that mirrors exactly how the Electron desktop version will later behave.
+
+ALL CODE MUST BE ELECTRON-COMPATIBLE, but must run normally in the Replit environment as a web app.
+
+🎯 GOAL
+
+Create a full working prototype of NexarOS consisting of:
+
+React Frontend (Vite + React + Tailwind + Framer Motion)
+
+Node.js Backend (Express)
+
+REST API for Nexar Games Store
+
+Web version of Library, Store, Home, Settings
+
+Mock Steam Integration (steam library JSON uploaded manually by user)
+
+Mock Installer System (simulated downloads + installs)
+
+OTA Update Checker (checks JSON manifest)
+
+Full Nexar dark/red UI theme
+
+This prototype must be designed so that I can later export the project and wrap it with Electron outside of Replit without changing the code structure.
+
+🖥 UI REQUIREMENTS
+
+Build all the pages below using the NexarOS signature theme:
+
+🎨 Nexar Color Palette
+
+Primary Background: #000000 / #111111
+
+Panels/Sections: #1A1A1A
+
+Neon Red Accent: #d00024
+
+Text Light: #EAEAEA
+
+Text Dim: #A3A3A3
+
+Pages to Build
+
+✔ Home Screen (carousel, continue playing, quick shortcuts)
+✔ Game Library (local JSON library, add/remove games)
+✔ Nexar Games Store (REST API-driven)
+✔ Game Details Page
+✔ Settings (Theme, Network placeholder, System Info)
+✔ Steam Library Import (upload JSON → display games)
+✔ Downloads & Installations Page (simulated)
+
+Each page must:
+
+be fully styled
+
+use animations
+
+be controller/keyboard-friendly
+
+feel premium (Xbox/PlayStation style UI)
+
+🗂 FOLDER STRUCTURE (REQUIRED)
+/nexaros
+  /frontend
+    /src
+      /components
+      /pages
+      /hooks
+      /assets
+      main.jsx
+      App.jsx
+    package.json
+    tailwind.config.js
+    vite.config.js
+
+  /backend
+    /routes
+      games.js
+    /data
+      games.json
+    server.js
+    package.json
+
+  /shared
+    config.json
+    sample_steam_library.json
+
+
+Keep this EXACT structure so it can be migrated into Electron later.
+
+🔧 BACKEND REQUIREMENTS
+
+Create an Express server with routes:
+
+GET /games → list store games
+
+GET /games/:id → game details
+
+GET /games/:id/download → simulate download
+
+GET /updates/latest → OTA manifest
+
+Use JSON files for storage.
+
+🎮 LIBRARY SYSTEM
+
+Since Replit cannot access the real filesystem:
+
+Implement a JSON-based virtual library
+
+Supports: add game, delete game, mark installed, track progress
+
+Later, this layer can be replaced with filesystem calls in Electron
+
+🔧 STEAM INTEGRATION (WEB VERSION)
+
+Replit cannot access Windows directories, so:
+
+Allow users to upload their Steam libraryfolders.json file
+
+Parse & display Steam games in the library
+
+Tag them as “Steam Game”
+
+🧠 WHAT THE AGENT MUST OUTPUT
+
+When writing code:
+
+Provide file-by-file content
+
+Include complete working code, not partials
+
+Ensure frontend + backend run in Replit
+
+Provide commands:
+
+npm install
+
+npm run dev (frontend)
+
+npm start (backend)
+
+Provide integration steps between frontend & backend
+
+Use the Nexar theme across all components
+
+⛔ WHAT NOT TO DO
+
+Do NOT try to run or configure Electron inside Replit
+
+Do NOT use absolute disk paths (C:/…)
+
+Do NOT insert pseudocode
+
+Do NOT leave blank components
+
+Do NOT simplify the UI beyond spec
+
+▶️ PRIMARY OBJECTIVE
+
+Deliver a complete, production-grade NexarOS web prototype that mirrors the final Electron app — all code fully functional inside Replit.
