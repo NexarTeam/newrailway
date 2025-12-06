@@ -1,0 +1,127 @@
+You are now updating the NexarOS “System Info” / “About” page so it works correctly for the PC Edition of NexarOS.
+
+=====================================================
+              SYSTEM INFO PAGE UPDATE
+=====================================================
+
+You must remove all handheld-specific fields from the UI and backend, including:
+- “Device: Nexar Handheld”
+- “Manufacturer: Sabre Collective (Hardware)”
+- “Serial Number: NXR-2024-XXXX”
+
+Replace them with PC-appropriate system information.
+
+=====================================================
+              NEW PC EDITION REQUIREMENTS
+=====================================================
+
+The System Info page must display the following:
+
+1. NexarOS Version
+   Example: “NexarOS 1.0.0 (PC Edition)”
+   Pull from a config file (e.g., shared/config.json).
+
+2. Device Type
+   Always show:
+   “Device: Nexar Desktop Environment”
+   (For now. Later will switch based on Electron hardware detection.)
+
+3. Manufacturer
+   Always show:
+   “Sabre Collective (Software Platform)”
+
+4. Nexar System ID
+   Generate a unique PC-specific ID on first launch and store it in a config JSON.
+   Format: NXR-PC-XXXX-XXXX
+   This must persist across sessions.
+
+5. Simulated Hardware Info (for Replit only):
+   Since Replit cannot access real PC hardware, simulate these fields for now:
+   - CPU: “Unknown (Simulated in Replit)”
+   - GPU: “Unknown (Simulated in Replit)”
+   - RAM: “Unknown (Simulated in Replit)”
+   - OS: “NexarOS PC Web Prototype”
+
+   IMPORTANT: Wrap these in helper functions so later, during Electron packaging, we replace them with actual OS/hardware detection.
+
+6. Update Status
+   Add a small section:
+   “Updates: Checking…” (then show current update availability using your OTA route)
+
+=====================================================
+                FRONTEND CHANGES
+=====================================================
+
+Modify the About/System Info page component:
+
+- Remove handheld fields.
+- Add the new fields listed above.
+- Use your premium NexarUI design language:
+  - bg-[#111111], rounded-2xl, p-8, neon red accents
+  - motion fade-in animation
+  - console-grade typography
+
+Add a section titled “Nexar System Identity” containing:
+- System ID
+- Device Type
+- Manufacturer
+
+Add a section titled “Hardware (Simulated)” containing:
+- CPU
+- GPU
+- RAM
+- OS
+
+Add a section titled “Software” containing:
+- NexarOS Version
+- Update status
+
+=====================================================
+              BACKEND / CONFIG CHANGES
+=====================================================
+
+1. In /shared/config.json:
+   Add:
+   {
+     "version": "1.0.0",
+     "edition": "PC",
+     "systemId": null
+   }
+
+2. Add a helper at backend startup to generate a systemId
+   if config.systemId is null:
+     systemId = "NXR-PC-" + random 4 hex + "-" + random 4 hex
+     save into config.json
+
+3. Add a route:
+   GET /system/info
+   Returns:
+   {
+     "version": "1.0.0 (PC Edition)",
+     "edition": "PC",
+     "systemId": "...",
+     "device": "Nexar Desktop Environment",
+     "manufacturer": "Sabre Collective (Software Platform)",
+     "hardware": {
+       "cpu": "Unknown (Simulated)",
+       "gpu": "Unknown (Simulated)",
+       "ram": "Unknown (Simulated)",
+       "os": "NexarOS PC Web Prototype"
+     }
+   }
+
+4. Frontend should fetch this route and display the data dynamically.
+
+=====================================================
+                CLEANUP TASKS
+=====================================================
+
+- Ensure no handheld references remain.
+- Ensure navigation links still work.
+- Ensure the new System Info page looks premium and consistent.
+- Replace any hardcoded values with config-based or route-based values.
+- Prepare code so later we can replace simulated hardware info with real Electron APIs.
+
+=====================================================
+Generate all updated files (frontend + backend) in full.
+=====================================================
