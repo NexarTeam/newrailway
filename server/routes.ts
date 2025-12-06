@@ -741,21 +741,6 @@ export async function registerRoutes(
 
     const unlockedAchievements: typeof ACHIEVEMENTS_LIST = [];
     const userSaves = findMany<CloudSave>("cloud_saves.json", (s) => s.userId === userId);
-    if (userSaves.length === 1) {
-      const existing = findOne<UserAchievement>("achievements.json",
-        (a) => a.userId === userId && a.achievementId === "cloud_saver"
-      );
-      if (!existing) {
-        insertOne<UserAchievement>("achievements.json", {
-          id: uuidv4(),
-          userId,
-          achievementId: "cloud_saver",
-          unlockedAt: new Date().toISOString(),
-        });
-        const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "cloud_saver");
-        if (achievement) unlockedAchievements.push(achievement);
-      }
-    }
 
     if (userSaves.length >= 10) {
       const existing = findOne<UserAchievement>("achievements.json",
