@@ -31,6 +31,8 @@ import AchievementsPage from "@/pages/AchievementsPage";
 import CloudSavesPage from "@/pages/CloudSavesPage";
 import WalletPage from "@/pages/WalletPage";
 import VerifyEmailPage from "@/pages/VerifyEmailPage";
+import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 
 const mockLibraryGames: Game[] = [
   { id: "lib-1", title: "Cyber Assault 2087", isInstalled: true, playTime: 245, size: "45.2 GB", genre: "Action RPG", rating: 4.5 },
@@ -70,9 +72,15 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Allow access to verification page without auth
+  // Allow access to public auth pages without authentication
   if (location.startsWith("/verify")) {
     return <VerifyEmailPage />;
+  }
+  if (location.startsWith("/forgot-password")) {
+    return <ForgotPasswordPage />;
+  }
+  if (location.startsWith("/reset-password")) {
+    return <ResetPasswordPage />;
   }
 
   if (!isAuthenticated) {

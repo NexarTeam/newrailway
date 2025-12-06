@@ -20,7 +20,7 @@ import {
   updateOne,
   deleteOne,
 } from "./utils/fileDb";
-import { sendVerificationEmail } from "./utils/email";
+import { sendVerificationEmail, sendPasswordResetEmail } from "./utils/email";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
 // System configuration
@@ -92,6 +92,8 @@ interface User {
   verificationToken: string;
   walletBalance: number;
   ownedGames: string[];
+  passwordResetToken?: string;
+  passwordResetTokenExpiry?: number;
 }
 
 interface WalletTransaction {
@@ -331,6 +333,91 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Resend verification error:", error);
       res.status(500).json({ message: "Failed to send verification email" });
+    }
+  });
+
+  // Password reset request - always returns success for security
+  app.post("/api/auth/requestPasswordReset", async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+      const user = findOne<User>("users.json", (u) => u.email.toLowerCase() === normalizedEmail);
+      
+      // Always return success to prevent email enumeration
+      if (!user || !user.verified) {
+        return res.json({ success: true });
+      }
+
+      // Generate secure reset token
+      const resetToken = uuidv4();
+      const resetTokenExpiry = Date.now() + 15 * 60 * 1000; // 15 minutes
+
+      // Update user with reset token
+      updateOne<User>("users.json", (u) => u.id === user.id, {
+        passwordResetToken: resetToken,
+        passwordResetTokenExpiry: resetTokenExpiry,
+      });
+
+      // Send password reset email
+      await sendPasswordResetEmail(user.email, user.username, resetToken);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Password reset request error:", error);
+      // Still return success to prevent enumeration
+      res.json({ success: true });
+    }
+  });
+
+  // Reset password with token
+  app.post("/api/auth/resetPassword", async (req, res) => {
+    try {
+      const { token, newPassword } = req.body;
+
+      if (!token || !newPassword) {
+        return res.status(400).json({ message: "Token and new password are required" });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      // Find user with this reset token
+      const user = findOne<User>("users.json", (u) => u.passwordResetToken === token);
+      
+      if (!user) {
+        return res.status(400).json({ message: "Invalid or expired reset token" });
+      }
+
+      // Check if token is expired
+      if (!user.passwordResetTokenExpiry || Date.now() > user.passwordResetTokenExpiry) {
+        // Clear the expired token
+        updateOne<User>("users.json", (u) => u.id === user.id, {
+          passwordResetToken: "",
+          passwordResetTokenExpiry: 0,
+        });
+        return res.status(400).json({ message: "Invalid or expired reset token" });
+      }
+
+      // Hash the new password
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+
+      // Update password and clear reset token
+      updateOne<User>("users.json", (u) => u.id === user.id, {
+        passwordHash,
+        passwordResetToken: "",
+        passwordResetTokenExpiry: 0,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Password reset error:", error);
+      res.status(500).json({ message: "Password reset failed" });
     }
   });
 

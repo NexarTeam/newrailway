@@ -171,7 +171,14 @@ export default function LoginPage() {
             )}
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 space-y-3 text-center">
+            <Link
+              href="/forgot-password"
+              data-testid="link-forgot-password"
+              className="text-[#A3A3A3] hover:text-[#EAEAEA] text-sm transition-colors block"
+            >
+              Forgot Password?
+            </Link>
             <p className="text-[#A3A3A3] text-sm">
               Don't have an account?{" "}
               <Link
