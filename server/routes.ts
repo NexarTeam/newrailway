@@ -21,6 +21,35 @@ import {
   deleteOne,
 } from "./utils/fileDb";
 
+// System configuration
+interface SystemConfig {
+  version: string;
+  edition: string;
+  systemId: string | null;
+}
+
+function getSystemConfig(): SystemConfig {
+  const configPath = path.join(process.cwd(), "shared/config.json");
+  try {
+    const data = fs.readFileSync(configPath, "utf-8");
+    return JSON.parse(data);
+  } catch {
+    return { version: "1.0.0", edition: "PC", systemId: null };
+  }
+}
+
+function saveSystemConfig(config: SystemConfig): void {
+  const configPath = path.join(process.cwd(), "shared/config.json");
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+}
+
+function generateSystemId(): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  const segment1 = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  const segment2 = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  return `NXR-PC-${segment1}-${segment2}`;
+}
+
 const avatarStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = path.join(process.cwd(), "server/uploads/avatars");
@@ -114,6 +143,31 @@ export async function registerRoutes(
     } else {
       res.status(404).json({ message: "Avatar not found" });
     }
+  });
+
+  // ==================== SYSTEM ROUTES ====================
+
+  app.get("/api/system/info", (req, res) => {
+    let config = getSystemConfig();
+    
+    if (!config.systemId) {
+      config.systemId = generateSystemId();
+      saveSystemConfig(config);
+    }
+
+    res.json({
+      version: `${config.version} (${config.edition} Edition)`,
+      edition: config.edition,
+      systemId: config.systemId,
+      device: "Nexar Desktop Environment",
+      manufacturer: "Sabre Collective (Software Platform)",
+      hardware: {
+        cpu: "Unknown (Simulated)",
+        gpu: "Unknown (Simulated)",
+        ram: "Unknown (Simulated)",
+        os: "NexarOS PC Web Prototype"
+      }
+    });
   });
 
   // ==================== AUTH ROUTES ====================

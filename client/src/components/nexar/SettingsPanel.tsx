@@ -1,12 +1,27 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Monitor, Wifi, HardDrive, Info, Palette, Zap, Shield, Bell } from "lucide-react";
+import { Monitor, Wifi, HardDrive, Info, Palette, Zap, Shield, Bell, Cpu, MonitorSmartphone, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { useQuery } from "@tanstack/react-query";
+
+interface SystemInfo {
+  version: string;
+  edition: string;
+  systemId: string;
+  device: string;
+  manufacturer: string;
+  hardware: {
+    cpu: string;
+    gpu: string;
+    ram: string;
+    os: string;
+  };
+}
 
 type SettingsTab = "display" | "performance" | "network" | "storage" | "notifications" | "system";
 
@@ -21,6 +36,11 @@ const tabs: { id: SettingsTab; label: string; icon: typeof Monitor }[] = [
 
 export default function SettingsPanel() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("display");
+  
+  const { data: systemInfo, isLoading: systemLoading } = useQuery<SystemInfo>({
+    queryKey: ["/api/system/info"],
+  });
+
   const [settings, setSettings] = useState({
     darkMode: true,
     accentGlow: true,
@@ -329,45 +349,121 @@ export default function SettingsPanel() {
                 <p className="text-sm text-muted-foreground">Device and software details</p>
               </div>
 
-              <Card>
-                <CardContent className="pt-6 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Software Version</span>
-                    <span className="font-medium text-foreground">NexarOS 1.0.0</span>
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Device</span>
-                    <span className="font-medium text-foreground">Nexar Handheld</span>
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Manufacturer</span>
-                    <span className="font-medium text-foreground">Sabre Collective</span>
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Serial Number</span>
-                    <span className="font-medium text-foreground font-mono">NXR-2024-XXXX</span>
-                  </div>
-                </CardContent>
-              </Card>
+              {systemLoading || !systemInfo ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-muted-foreground text-center">Loading system information...</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <MonitorSmartphone className="w-5 h-5 text-primary" />
+                        Nexar System Identity
+                      </CardTitle>
+                      <CardDescription>Core system identification</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">System ID</span>
+                        <span className="font-medium text-foreground font-mono" data-testid="text-system-id">
+                          {systemInfo?.systemId || "Unknown"}
+                        </span>
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Device Type</span>
+                        <span className="font-medium text-foreground" data-testid="text-device-type">
+                          {systemInfo?.device || "Unknown"}
+                        </span>
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Manufacturer</span>
+                        <span className="font-medium text-foreground" data-testid="text-manufacturer">
+                          {systemInfo?.manufacturer || "Unknown"}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-              <Card>
-                <CardContent className="pt-6 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-foreground">Automatic Updates</p>
-                      <p className="text-sm text-muted-foreground">Download updates automatically</p>
-                    </div>
-                    <Switch 
-                      checked={settings.autoUpdate}
-                      onCheckedChange={(v) => updateSetting("autoUpdate", v)}
-                      data-testid="switch-auto-update"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Cpu className="w-5 h-5 text-primary" />
+                        Hardware (Simulated)
+                      </CardTitle>
+                      <CardDescription>Virtual hardware configuration</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">CPU</span>
+                        <span className="font-medium text-foreground" data-testid="text-cpu">
+                          {systemInfo?.hardware?.cpu || "Unknown"}
+                        </span>
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">GPU</span>
+                        <span className="font-medium text-foreground" data-testid="text-gpu">
+                          {systemInfo?.hardware?.gpu || "Unknown"}
+                        </span>
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">RAM</span>
+                        <span className="font-medium text-foreground" data-testid="text-ram">
+                          {systemInfo?.hardware?.ram || "Unknown"}
+                        </span>
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Operating System</span>
+                        <span className="font-medium text-foreground" data-testid="text-os">
+                          {systemInfo?.hardware?.os || "Unknown"}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Server className="w-5 h-5 text-primary" />
+                        Software
+                      </CardTitle>
+                      <CardDescription>NexarOS software information</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">NexarOS Version</span>
+                        <span className="font-medium text-foreground" data-testid="text-version">
+                          {systemInfo?.version || "Unknown"}
+                        </span>
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Update Status</span>
+                        <span className="font-medium text-green-500" data-testid="text-update-status">Up to date</span>
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-foreground">Automatic Updates</p>
+                          <p className="text-sm text-muted-foreground">Download updates automatically</p>
+                        </div>
+                        <Switch 
+                          checked={settings.autoUpdate}
+                          onCheckedChange={(v) => updateSetting("autoUpdate", v)}
+                          data-testid="switch-auto-update"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
 
               <Button variant="outline" className="w-full" data-testid="button-check-updates">
                 <Shield className="w-4 h-4 mr-2" />
