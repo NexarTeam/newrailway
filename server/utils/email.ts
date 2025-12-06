@@ -33,11 +33,13 @@ async function getCredentials() {
   };
 }
 
+const FROM_EMAIL = 'NexarOS <hello@nexargames.co.uk>';
+
 async function getResendClient() {
   const { apiKey } = await getCredentials();
   return {
     client: new Resend(apiKey),
-    fromEmail: connectionSettings.settings.from_email
+    fromEmail: FROM_EMAIL
   };
 }
 
@@ -52,7 +54,7 @@ export async function sendVerificationEmail(toEmail: string, username: string, v
     const verificationLink = `${baseUrl}/verify?token=${verificationToken}`;
     
     await client.emails.send({
-      from: fromEmail || 'NexarOS <noreply@resend.dev>',
+      from: fromEmail,
       to: toEmail,
       subject: 'Verify your NexarOS account',
       html: `
@@ -92,7 +94,7 @@ export async function sendPasswordResetEmail(toEmail: string, username: string, 
     const resetLink = `${baseUrl}/reset-password?token=${resetToken}`;
     
     await client.emails.send({
-      from: fromEmail || 'NexarOS <noreply@resend.dev>',
+      from: fromEmail,
       to: toEmail,
       subject: 'Reset your NexarOS password',
       html: `
