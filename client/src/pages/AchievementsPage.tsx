@@ -104,9 +104,14 @@ export default function AchievementsPage() {
               >
                 <div className="flex items-start gap-4">
                   {achievementImageMap[achievement.id] ? (
-                    <div className={`w-16 h-16 rounded-xl overflow-hidden ${
-                      !achievement.unlocked && "opacity-40 grayscale"
-                    }`}>
+                    <div 
+                      className={`w-16 h-16 flex-shrink-0 ${
+                        !achievement.unlocked && "opacity-40 grayscale"
+                      }`}
+                      style={{
+                        clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
+                      }}
+                    >
                       <img 
                         src={achievementImageMap[achievement.id]} 
                         alt={achievement.name}

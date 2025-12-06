@@ -77,9 +77,10 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
 
 function NexarOS() {
   const { toast } = useToast();
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
   const [currentPage, setCurrentPage] = useState<NavPage>("home");
   const [libraryGames, setLibraryGames] = useState<Game[]>(mockLibraryGames);
+  const [pendingFriendRequests, setPendingFriendRequests] = useState<number>(0);
   const [downloads, setDownloads] = useState<DownloadInfo[]>([
     { 
       id: "dl-1", 
@@ -117,6 +118,28 @@ function NexarOS() {
     }, 3000);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    
+    const fetchPendingRequests = async () => {
+      try {
+        const response = await fetch("/api/friends/requests", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const requests = await response.json();
+          setPendingFriendRequests(requests.length);
+        }
+      } catch (error) {
+        console.error("Failed to fetch friend requests:", error);
+      }
+    };
+
+    fetchPendingRequests();
+    const interval = setInterval(fetchPendingRequests, 30000);
+    return () => clearInterval(interval);
+  }, [token]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -277,6 +300,7 @@ function NexarOS() {
         currentPage={currentPage}
         onNavigate={setCurrentPage}
         downloadCount={activeDownloadCount}
+        pendingFriendRequests={pendingFriendRequests}
         user={user ? { username: user.username, avatarUrl: user.avatarUrl } : null}
         onLogout={logout}
       />

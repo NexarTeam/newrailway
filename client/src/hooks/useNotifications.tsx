@@ -4,6 +4,12 @@ import { useLocation } from "wouter";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Trophy, MessageCircle, X } from "lucide-react";
 
+import firstFriendImage from "@assets/first_friend_ach_1765038288978.png";
+
+const achievementImageMap: Record<string, string> = {
+  first_friend: firstFriendImage,
+};
+
 interface Message {
   id: string;
   fromId: string;
@@ -241,9 +247,24 @@ export function NotificationProvider({ children, userId, token }: NotificationPr
               <div className="p-4 flex items-start gap-3">
                 {notification.type === "achievement" ? (
                   <>
-                    <div className="flex-shrink-0 w-12 h-12 rounded-full bg-[#d00024]/20 border border-[#d00024]/50 flex items-center justify-center">
-                      <Trophy className="w-6 h-6 text-[#d00024]" />
-                    </div>
+                    {achievementImageMap[notification.achievementId] ? (
+                      <div 
+                        className="flex-shrink-0 w-12 h-12"
+                        style={{
+                          clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)",
+                        }}
+                      >
+                        <img 
+                          src={achievementImageMap[notification.achievementId]} 
+                          alt={notification.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex-shrink-0 w-12 h-12 rounded-full bg-[#d00024]/20 border border-[#d00024]/50 flex items-center justify-center">
+                        <Trophy className="w-6 h-6 text-[#d00024]" />
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-[#d00024] text-xs font-semibold uppercase tracking-wider">Achievement Unlocked</span>

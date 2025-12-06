@@ -11,6 +11,7 @@ interface NexarSidebarProps {
   currentPage: NavPage;
   onNavigate: (page: NavPage) => void;
   downloadCount?: number;
+  pendingFriendRequests?: number;
   user?: { username: string; avatarUrl?: string } | null;
   onLogout?: () => void;
 }
@@ -34,7 +35,7 @@ const settingsItems: { id: NavPage; label: string; icon: typeof Home }[] = [
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-export default function NexarSidebar({ currentPage, onNavigate, downloadCount, user, onLogout }: NexarSidebarProps) {
+export default function NexarSidebar({ currentPage, onNavigate, downloadCount, pendingFriendRequests, user, onLogout }: NexarSidebarProps) {
   const getInitials = (name: string) => name.slice(0, 2).toUpperCase();
 
   return (
@@ -118,6 +119,14 @@ export default function NexarSidebar({ currentPage, onNavigate, downloadCount, u
                 )}
                 <item.icon className={`w-5 h-5 ${isActive ? "text-primary" : ""}`} />
                 <span>{item.label}</span>
+                {item.id === "friends" && pendingFriendRequests && pendingFriendRequests > 0 && (
+                  <span 
+                    className="ml-auto bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full"
+                    data-testid="friend-requests-badge"
+                  >
+                    {pendingFriendRequests}
+                  </span>
+                )}
               </Button>
             </motion.div>
           );
