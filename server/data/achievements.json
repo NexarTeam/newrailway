@@ -58,5 +58,17 @@
     "userId": "711b15cf-e5c4-4953-b075-b28fac5ca171",
     "achievementId": "first_login",
     "unlockedAt": "2025-12-06T16:27:58.471Z"
+  },
+  {
+    "id": "9a9b3b22-4acb-482e-a84a-3840aba91563",
+    "userId": "092544e1-34f0-4578-b222-ea6b9f5b0199",
+    "achievementId": "first_friend",
+    "unlockedAt": "2025-12-06T16:29:12.156Z"
+  },
+  {
+    "id": "a13787c5-c58e-4fdb-aac9-387bb0766fa6",
+    "userId": "711b15cf-e5c4-4953-b075-b28fac5ca171",
+    "achievementId": "first_friend",
+    "unlockedAt": "2025-12-06T16:29:12.157Z"
   }
 ]
