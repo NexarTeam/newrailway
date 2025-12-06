@@ -1,0 +1,195 @@
+YOU ARE NOW BUILDING THE NEXARID SYSTEM FOR NEXAROS.
+
+IMPORTANT:
+- Follow the existing NexarOS folder structure.
+- All styling must match the Nexar dark theme.
+- Backend must use Express + JSON files for storage.
+- Frontend must use React, Tailwind, Framer Motion.
+- All code MUST be complete, no placeholders.
+
+===========================================
+NEXARID — USER ACCOUNT SYSTEM REQUIREMENTS
+===========================================
+
+You must add the following full systems:
+
+1. AUTHENTICATION  
+   - Register (email, username, password)
+   - Login (email or username + password)
+   - JWT authentication (7-day token)
+   - /auth/register
+   - /auth/login
+   - /auth/me (returns logged-in user)
+   - Hash passwords using bcryptjs
+   - UUID IDs for all users
+   - Store users in backend/data/users.json
+
+User object structure:
+{
+  "id": "",
+  "email": "",
+  "username": "",
+  "passwordHash": "",
+  "avatarUrl": "",
+  "bio": "",
+  "createdAt": ""
+}
+
+2. FRIENDS SYSTEM  
+   - Send friend request
+   - Accept friend request
+   - Reject friend request
+   - Remove friend
+   - Get friend list
+   - Store in backend/data/friends.json
+
+Each record looks like:
+{
+  "id": "",
+  "senderId": "",
+  "receiverId": "",
+  "status": "pending | accepted | rejected"
+}
+
+Routes required:
+/friends/send
+/friends/accept
+/friends/reject
+/friends/remove
+/friends/list/:userId
+
+3. MESSAGING SYSTEM  
+   - Direct messages between two users
+   - Store in backend/data/messages.json
+   - Each message:
+{
+  "id": "",
+  "fromId": "",
+  "toId": "",
+  "text": "",
+  "timestamp": ""
+}
+
+/messages/send
+/messages/thread/:userId
+
+4. ACHIEVEMENTS  
+   - Simple achievement unlock system
+   - Store per-user achievements
+   - backend/data/achievements.json
+
+Achievement model:
+{
+  "userId": "",
+  "achievementId": "",
+  "unlockedAt": ""
+}
+
+/achievements/unlock
+/achievements/user/:id
+
+5. CLOUD SAVES (SIMULATED)
+- Upload save file (base64 string or JSON)
+/cloud/upload
+/cloud/download/:userId
+/cloud/list/:userId
+
+Store in backend/data/cloud_saves.json
+
+{
+  "userId": "",
+  "filename": "",
+  "data": "",
+  "uploadedAt": ""
+}
+
+===============================
+BACKEND IMPLEMENTATION DETAILS
+===============================
+- Create /backend/utils/fileDb.js with readJson + writeJson helpers.
+- Create /backend/middleware/auth.js for JWT authentication.
+- Modify /backend/server.js to mount new routes:
+   /auth
+   /friends
+   /messages
+   /achievements
+   /cloud
+
+Everything must be fully functional.
+
+=====================================
+FRONTEND IMPLEMENTATION REQUIREMENTS
+=====================================
+
+Create pages under /frontend/src/pages:
+
+1. LoginPage.jsx
+2. RegisterPage.jsx
+3. ProfilePage.jsx
+4. FriendsPage.jsx
+5. MessagesPage.jsx
+6. AchievementsPage.jsx
+7. CloudSavesPage.jsx
+
+Each page must:
+- Use the Nexar dark/red UI theme ONLY.
+- Have premium console UI style (rounded-2xl, neon red accents, spacing p-6 p-8, Framer Motion animations).
+- Use JWT auth stored in localStorage.
+- Redirect to login if not authenticated.
+- Show user avatar, username, friends list, etc.
+
+Create React hooks:
+- useAuth()
+- useApi()
+
+Add a Top Navigation bar with:
+- Home
+- Library
+- Store
+- Friends
+- Messages
+- Profile
+
+=====================================
+INTEGRATION REQUIREMENTS
+=====================================
+- On successful login, store JWT in localStorage.
+- Attach JWT to all API requests in Authorization header.
+- In the Library and Store pages, show username/avatar in the corner.
+- Update routing so user must be logged in for all pages except login/register.
+
+=====================================
+WHAT TO GENERATE FOR ME
+=====================================
+You MUST output:
+
+1. Full backend code for:
+   - fileDb.js
+   - auth.js
+   - friends.js
+   - messages.js
+   - achievements.js
+   - cloud.js
+   - Updates to server.js
+   - All JSON data structures initialized properly
+
+2. Full frontend code for:
+   - Login page
+   - Register page
+   - Profile page
+   - Friends page
+   - Messages page
+   - Achievements page
+   - Cloud saves page
+   - Navigation bar
+   - Auth hooks
+   - API hooks
+   - Updated routing
+
+3. All UI must follow the Nexar dark theme and premium console aesthetic.
+
+4. Ensure the full system RUNS immediately in Replit.
+
+=====================================
+BEGIN GENERATION NOW.
+=====================================
