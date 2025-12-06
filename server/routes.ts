@@ -128,6 +128,7 @@ const ACHIEVEMENTS_LIST = [
   { id: "social_butterfly", name: "Social Butterfly", description: "Have 5 friends", icon: "heart" },
   { id: "chat_master", name: "Chat Master", description: "Send 50 messages", icon: "messages-square" },
   { id: "data_hoarder", name: "Data Hoarder", description: "Upload 10 cloud saves", icon: "database" },
+  { id: "developer", name: "Developer", description: "Have a game approved for the Nexar Store", icon: "code" },
 ];
 
 export async function registerRoutes(

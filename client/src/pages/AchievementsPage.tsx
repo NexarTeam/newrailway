@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useApi } from "@/hooks/useApi";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Trophy, User, Users, MessageCircle, Cloud, Heart, MessagesSquare, Database, Lock } from "lucide-react";
+import { Loader2, Trophy, User, Users, MessageCircle, Cloud, Heart, MessagesSquare, Database, Lock, Code } from "lucide-react";
 
 import firstFriendImage from "@assets/first_friend_ach_(1)_1765039658293.png";
 import socialButterflyImage from "@assets/social_butterfly_ach_(1)_1765040235877.png";
@@ -34,6 +34,7 @@ const iconMap: Record<string, typeof Trophy> = {
   heart: Heart,
   "messages-square": MessagesSquare,
   database: Database,
+  code: Code,
 };
 
 export default function AchievementsPage() {
