@@ -28,5 +28,11 @@
     "userId": "092544e1-34f0-4578-b222-ea6b9f5b0199",
     "achievementId": "profile_complete",
     "unlockedAt": "2025-12-06T15:09:59.561Z"
+  },
+  {
+    "id": "c128d0c6-debc-44e4-9129-1e1c751a7744",
+    "userId": "df9f6fcf-7149-4326-88c7-ccffe1775c32",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T15:29:41.243Z"
   }
 ]

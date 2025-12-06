@@ -93,6 +93,11 @@ export function NotificationProvider({ children, userId, token }: NotificationPr
   const lastPollTime = useRef<number>(Date.now());
   const isInitialized = useRef(false);
   const prevUserIdRef = useRef<string | null | undefined>(null);
+  const locationRef = useRef(location);
+
+  useEffect(() => {
+    locationRef.current = location;
+  }, [location]);
 
   const dismissNotification = useCallback((id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
@@ -148,7 +153,6 @@ export function NotificationProvider({ children, userId, token }: NotificationPr
       return;
     }
 
-    const isOnMessagesPage = location === "/messages";
     const currentUserId = userId;
 
     const pollMessages = async () => {
@@ -160,6 +164,8 @@ export function NotificationProvider({ children, userId, token }: NotificationPr
         if (!response.ok) return;
         
         const conversations: Conversation[] = await response.json();
+        
+        const isOnMessagesPage = locationRef.current === "/messages";
         
         for (const conv of conversations) {
           const lastMsg = conv.lastMessage;
@@ -201,7 +207,7 @@ export function NotificationProvider({ children, userId, token }: NotificationPr
     const intervalId = setInterval(pollMessages, POLLING_INTERVAL);
 
     return () => clearInterval(intervalId);
-  }, [location, addNotification, token, userId]);
+  }, [addNotification, token, userId]);
 
   const handleNotificationClick = (notification: Notification) => {
     dismissNotification(notification.id);

@@ -34,5 +34,14 @@
     "avatarUrl": "",
     "bio": "",
     "createdAt": "2025-12-06T14:58:02.304Z"
+  },
+  {
+    "id": "df9f6fcf-7149-4326-88c7-ccffe1775c32",
+    "email": "testuser_UMJWXR@test.com",
+    "username": "testuser_UMJWXR",
+    "passwordHash": "$2b$10$INBfeRLP3/6m3dSXai7dteE.MgxIN/um2mIrvjN4Fstk8dkSjTRa2",
+    "avatarUrl": "",
+    "bio": "This is my test bio for achievement testing",
+    "createdAt": "2025-12-06T15:29:41.242Z"
   }
 ]
