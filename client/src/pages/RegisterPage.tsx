@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
+import { useNotifications } from "@/hooks/useNotifications";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +18,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { register } = useAuth();
+  const { showAchievement } = useNotifications();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -44,8 +46,11 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      await register(email, username, password);
+      const unlockedAchievements = await register(email, username, password);
       toast({ title: "Welcome to NexarOS!", description: "Your account has been created." });
+      unlockedAchievements.forEach((achievement) => {
+        showAchievement(achievement);
+      });
       setLocation("/");
     } catch (error) {
       toast({

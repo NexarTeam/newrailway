@@ -166,8 +166,13 @@ export async function registerRoutes(
         username: user.username,
       });
 
+      const firstLoginAchievement = ACHIEVEMENTS_LIST.find(a => a.id === "first_login");
       const { passwordHash: _, ...userWithoutPassword } = user;
-      res.status(201).json({ user: userWithoutPassword, token });
+      res.status(201).json({ 
+        user: userWithoutPassword, 
+        token,
+        unlockedAchievements: firstLoginAchievement ? [firstLoginAchievement] : []
+      });
     } catch (error) {
       console.error("Register error:", error);
       res.status(500).json({ message: "Registration failed" });
@@ -235,6 +240,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "User not found" });
       }
 
+      const unlockedAchievements: typeof ACHIEVEMENTS_LIST = [];
       if (updated.avatarUrl && updated.bio) {
         const existing = findOne<UserAchievement>("achievements.json", 
           (a) => a.userId === req.user!.userId && a.achievementId === "profile_complete"
@@ -246,11 +252,13 @@ export async function registerRoutes(
             achievementId: "profile_complete",
             unlockedAt: new Date().toISOString(),
           });
+          const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "profile_complete");
+          if (achievement) unlockedAchievements.push(achievement);
         }
       }
 
       const { passwordHash: _, ...userWithoutPassword } = updated;
-      res.json(userWithoutPassword);
+      res.json({ ...userWithoutPassword, unlockedAchievements });
     } catch (error) {
       console.error("Profile update error:", error);
       res.status(500).json({ message: "Profile update failed" });
@@ -270,6 +278,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "User not found" });
       }
 
+      const unlockedAchievements: typeof ACHIEVEMENTS_LIST = [];
       if (updated.avatarUrl && updated.bio) {
         const existing = findOne<UserAchievement>("achievements.json", 
           (a) => a.userId === req.user!.userId && a.achievementId === "profile_complete"
@@ -281,11 +290,13 @@ export async function registerRoutes(
             achievementId: "profile_complete",
             unlockedAt: new Date().toISOString(),
           });
+          const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "profile_complete");
+          if (achievement) unlockedAchievements.push(achievement);
         }
       }
 
       const { passwordHash: _, ...userWithoutPassword } = updated;
-      res.json(userWithoutPassword);
+      res.json({ ...userWithoutPassword, unlockedAchievements });
     } catch (error) {
       console.error("Avatar upload error:", error);
       res.status(500).json({ message: "Avatar upload failed" });
@@ -406,6 +417,8 @@ export async function registerRoutes(
 
     updateOne<FriendRequest>("friends.json", (fr) => fr.id === requestId, { status: "accepted" });
 
+    const unlockedAchievements: typeof ACHIEVEMENTS_LIST = [];
+    
     [userId, friendRequest.senderId].forEach((uid) => {
       const friendCount = findMany<FriendRequest>("friends.json",
         (fr) => fr.status === "accepted" && (fr.senderId === uid || fr.receiverId === uid)
@@ -422,6 +435,10 @@ export async function registerRoutes(
             achievementId: "first_friend",
             unlockedAt: new Date().toISOString(),
           });
+          if (uid === userId) {
+            const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "first_friend");
+            if (achievement) unlockedAchievements.push(achievement);
+          }
         }
       }
 
@@ -436,11 +453,15 @@ export async function registerRoutes(
             achievementId: "social_butterfly",
             unlockedAt: new Date().toISOString(),
           });
+          if (uid === userId) {
+            const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "social_butterfly");
+            if (achievement) unlockedAchievements.push(achievement);
+          }
         }
       }
     });
 
-    res.json({ message: "Friend request accepted" });
+    res.json({ message: "Friend request accepted", unlockedAchievements });
   });
 
   app.post("/api/friends/reject/:requestId", authMiddleware, (req: AuthenticatedRequest, res) => {
@@ -568,6 +589,7 @@ export async function registerRoutes(
 
     insertOne("messages.json", message);
 
+    const unlockedAchievements: typeof ACHIEVEMENTS_LIST = [];
     const userMessages = findMany<Message>("messages.json", (m) => m.fromId === userId);
     if (userMessages.length === 1) {
       const existing = findOne<UserAchievement>("achievements.json",
@@ -580,6 +602,8 @@ export async function registerRoutes(
           achievementId: "messenger",
           unlockedAt: new Date().toISOString(),
         });
+        const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "messenger");
+        if (achievement) unlockedAchievements.push(achievement);
       }
     }
 
@@ -594,10 +618,12 @@ export async function registerRoutes(
           achievementId: "chat_master",
           unlockedAt: new Date().toISOString(),
         });
+        const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "chat_master");
+        if (achievement) unlockedAchievements.push(achievement);
       }
     }
 
-    res.status(201).json(message);
+    res.status(201).json({ ...message, unlockedAchievements });
   });
 
   // ==================== ACHIEVEMENTS ROUTES ====================
@@ -659,6 +685,7 @@ export async function registerRoutes(
 
     insertOne("cloud_saves.json", cloudSave);
 
+    const unlockedAchievements: typeof ACHIEVEMENTS_LIST = [];
     const userSaves = findMany<CloudSave>("cloud_saves.json", (s) => s.userId === userId);
     if (userSaves.length === 1) {
       const existing = findOne<UserAchievement>("achievements.json",
@@ -671,6 +698,8 @@ export async function registerRoutes(
           achievementId: "cloud_saver",
           unlockedAt: new Date().toISOString(),
         });
+        const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "cloud_saver");
+        if (achievement) unlockedAchievements.push(achievement);
       }
     }
 
@@ -685,11 +714,13 @@ export async function registerRoutes(
           achievementId: "data_hoarder",
           unlockedAt: new Date().toISOString(),
         });
+        const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "data_hoarder");
+        if (achievement) unlockedAchievements.push(achievement);
       }
     }
 
     const { data: _, ...saveWithoutData } = cloudSave;
-    res.status(201).json(saveWithoutData);
+    res.status(201).json({ ...saveWithoutData, unlockedAchievements });
   });
 
   app.patch("/api/cloud/:saveId", authMiddleware, (req: AuthenticatedRequest, res) => {

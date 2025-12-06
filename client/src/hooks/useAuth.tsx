@@ -1,5 +1,12 @@
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
+
+interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+}
 
 interface User {
   id: string;
@@ -16,7 +23,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, username: string, password: string) => Promise<void>;
+  register: (email: string, username: string, password: string) => Promise<Achievement[]>;
   logout: () => void;
   updateUser: (user: User) => void;
 }
@@ -79,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(data.user);
   };
 
-  const register = async (email: string, username: string, password: string) => {
+  const register = async (email: string, username: string, password: string): Promise<Achievement[]> => {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -95,6 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("nexar_token", data.token);
     setToken(data.token);
     setUser(data.user);
+    return data.unlockedAchievements || [];
   };
 
   const logout = () => {

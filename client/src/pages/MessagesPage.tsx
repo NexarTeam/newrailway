@@ -2,12 +2,20 @@ import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useApi } from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
+import { useNotifications } from "@/hooks/useNotifications";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Send, MessageCircle, ArrowLeft } from "lucide-react";
+
+interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+}
 
 interface User {
   id: string;
@@ -31,6 +39,7 @@ interface Conversation {
 export default function MessagesPage() {
   const { get, post } = useApi();
   const { user } = useAuth();
+  const { showAchievement } = useNotifications();
   const { toast } = useToast();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedPartner, setSelectedPartner] = useState<User | null>(null);
@@ -81,13 +90,17 @@ export default function MessagesPage() {
     if (!newMessage.trim() || !selectedPartner) return;
     setIsSending(true);
     try {
-      const message = await post<Message>("/api/messages", {
+      const response = await post<Message & { unlockedAchievements?: Achievement[] }>("/api/messages", {
         toId: selectedPartner.id,
         text: newMessage,
       });
+      const { unlockedAchievements, ...message } = response;
       setMessages((prev) => [...prev, message]);
       setNewMessage("");
       fetchConversations();
+      if (unlockedAchievements?.length) {
+        unlockedAchievements.forEach((achievement) => showAchievement(achievement));
+      }
     } catch (error) {
       toast({ title: "Failed to send message", variant: "destructive" });
     } finally {

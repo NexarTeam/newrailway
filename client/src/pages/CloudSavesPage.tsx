@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useApi } from "@/hooks/useApi";
+import { useNotifications } from "@/hooks/useNotifications";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +16,13 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Cloud, Plus, Download, Trash2, Edit, FileText, Calendar } from "lucide-react";
 
+interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+}
+
 interface CloudSave {
   id: string;
   filename: string;
@@ -24,6 +32,7 @@ interface CloudSave {
 
 export default function CloudSavesPage() {
   const { get, post, patch, del } = useApi();
+  const { showAchievement } = useNotifications();
   const { toast } = useToast();
   const [saves, setSaves] = useState<CloudSave[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -61,8 +70,12 @@ export default function CloudSavesPage() {
         await patch(`/api/cloud/${editingSave.id}`, { filename, data });
         toast({ title: "Cloud save updated" });
       } else {
-        await post("/api/cloud", { filename, data });
+        const response = await post<CloudSave & { unlockedAchievements?: Achievement[] }>("/api/cloud", { filename, data });
+        const { unlockedAchievements } = response;
         toast({ title: "Cloud save uploaded" });
+        if (unlockedAchievements?.length) {
+          unlockedAchievements.forEach((achievement) => showAchievement(achievement));
+        }
       }
       setIsDialogOpen(false);
       setFilename("");

@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { useApi } from "@/hooks/useApi";
+import { useNotifications } from "@/hooks/useNotifications";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,9 +11,17 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Save, User, Calendar, Upload, Camera } from "lucide-react";
 
+interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+}
+
 export default function ProfilePage() {
   const { user, updateUser } = useAuth();
   const { patch } = useApi();
+  const { showAchievement } = useNotifications();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -49,8 +58,14 @@ export default function ProfilePage() {
       }
 
       const updated = await response.json();
-      updateUser(updated);
+      const { unlockedAchievements, ...userData } = updated;
+      updateUser(userData);
       toast({ title: "Avatar updated", description: "Your new avatar has been saved." });
+      if (unlockedAchievements?.length) {
+        unlockedAchievements.forEach((achievement: Achievement) => {
+          showAchievement(achievement);
+        });
+      }
     } catch (error) {
       toast({
         title: "Upload failed",
@@ -66,12 +81,20 @@ export default function ProfilePage() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const updated = await patch<typeof user>("/api/auth/profile", {
+      const response = await patch<{ unlockedAchievements?: Achievement[] } & typeof user>("/api/auth/profile", {
         username,
         bio,
       });
-      if (updated) {
-        updateUser(updated);
+      if (response) {
+        const { unlockedAchievements, ...userData } = response;
+        if (userData) {
+          updateUser(userData as NonNullable<typeof user>);
+        }
+        if (unlockedAchievements?.length) {
+          unlockedAchievements.forEach((achievement) => {
+            showAchievement(achievement);
+          });
+        }
       }
       toast({ title: "Profile updated", description: "Your changes have been saved." });
       setIsEditing(false);

@@ -1,12 +1,20 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useApi } from "@/hooks/useApi";
+import { useNotifications } from "@/hooks/useNotifications";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, UserPlus, Check, X, Trash2, Search, Users, Send, Clock } from "lucide-react";
+
+interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+}
 
 interface User {
   id: string;
@@ -23,6 +31,7 @@ interface FriendRequest {
 
 export default function FriendsPage() {
   const { get, post, del } = useApi();
+  const { showAchievement } = useNotifications();
   const { toast } = useToast();
   const [friends, setFriends] = useState<User[]>([]);
   const [requests, setRequests] = useState<FriendRequest[]>([]);
@@ -93,8 +102,13 @@ export default function FriendsPage() {
   const handleAccept = async (requestId: string) => {
     setPendingActions((prev) => new Set(prev).add(requestId));
     try {
-      await post(`/api/friends/accept/${requestId}`, {});
+      const response = await post<{ message: string; unlockedAchievements?: Achievement[] }>(`/api/friends/accept/${requestId}`, {});
       toast({ title: "Friend request accepted!" });
+      if (response?.unlockedAchievements?.length) {
+        response.unlockedAchievements.forEach((achievement) => {
+          showAchievement(achievement);
+        });
+      }
       fetchData();
     } catch (error) {
       toast({ title: "Failed to accept request", variant: "destructive" });
