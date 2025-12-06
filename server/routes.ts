@@ -124,7 +124,6 @@ const ACHIEVEMENTS_LIST = [
   { id: "profile_complete", name: "Profile Complete", description: "Complete your profile with avatar and bio", icon: "user" },
   { id: "first_friend", name: "First Friend", description: "Add your first friend", icon: "users" },
   { id: "messenger", name: "Messenger", description: "Send your first message", icon: "message-circle" },
-  { id: "cloud_saver", name: "Cloud Saver", description: "Upload your first cloud save", icon: "cloud" },
   { id: "social_butterfly", name: "Social Butterfly", description: "Have 5 friends", icon: "heart" },
   { id: "chat_master", name: "Chat Master", description: "Send 50 messages", icon: "messages-square" },
   { id: "data_hoarder", name: "Data Hoarder", description: "Upload 10 cloud saves", icon: "database" },
