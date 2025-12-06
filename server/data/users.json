@@ -83,5 +83,18 @@
     "verificationToken": "524ff3d8-d4ec-45e1-bfa2-886c0ad9ea88",
     "walletBalance": 0,
     "ownedGames": []
+  },
+  {
+    "id": "9a23d5c3-45ec-4be1-a9bc-54c47a8ca02d",
+    "email": "parabellumstudios2@gmail.com",
+    "username": "ParabellumStudios",
+    "passwordHash": "$2b$10$1a75z08e7bNiZPp8D094TugIguhktgzi6Yhu31FXDgapWbGxQkilG",
+    "avatarUrl": "",
+    "bio": "",
+    "createdAt": "2025-12-06T18:27:22.881Z",
+    "verified": false,
+    "verificationToken": "e67ec9df-76d6-484f-9ada-9e0d7a925d3a",
+    "walletBalance": 0,
+    "ownedGames": []
   }
 ]
