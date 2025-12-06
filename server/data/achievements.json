@@ -76,5 +76,11 @@
     "userId": "9a23d5c3-45ec-4be1-a9bc-54c47a8ca02d",
     "achievementId": "first_login",
     "unlockedAt": "2025-12-06T18:27:22.882Z"
+  },
+  {
+    "id": "f93cb05c-326a-4062-ab83-4e3fbe5f0dc1",
+    "userId": "1f5ade16-c5f9-4bb7-a7ce-7aef1e78b76e",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T18:40:50.240Z"
   }
 ]

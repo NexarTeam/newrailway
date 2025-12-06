@@ -52,10 +52,8 @@ export default function LoginPage() {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Invalid credentials";
       
-      // Check if this is a verification required error
-      if (errorMessage.includes("verify your email")) {
-        setShowVerificationMessage(true);
-      }
+      // Always show verification help on login failure (we can't distinguish the reason for security)
+      setShowVerificationMessage(true);
       
       toast({
         title: "Login failed",
@@ -146,17 +144,17 @@ export default function LoginPage() {
             {showVerificationMessage && (
               <div className="bg-[#111111] border border-[#333333] rounded-lg p-4 mt-4">
                 <div className="flex items-start gap-3">
-                  <Mail className="w-5 h-5 text-[#d00024] mt-0.5 flex-shrink-0" />
+                  <Mail className="w-5 h-5 text-[#666666] mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
                     <p className="text-sm text-[#A3A3A3]">
-                      Your email is not verified. Check your inbox or click below to resend.
+                      Need to verify your email? Check your inbox or request a new verification link.
                     </p>
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       onClick={handleResendVerification}
-                      disabled={isResending}
+                      disabled={isResending || !email}
                       data-testid="button-resend-verification"
                       className="mt-2 text-[#d00024] hover:text-[#ff1a3a] p-0 h-auto"
                     >

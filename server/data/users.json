@@ -96,5 +96,18 @@
     "verificationToken": "e67ec9df-76d6-484f-9ada-9e0d7a925d3a",
     "walletBalance": 0,
     "ownedGames": []
+  },
+  {
+    "id": "1f5ade16-c5f9-4bb7-a7ce-7aef1e78b76e",
+    "email": "test_NjCGS6@example.com",
+    "username": "NjCGS6",
+    "passwordHash": "$2b$10$FwVtWof2HyLMhPAH94Tgz.0ycd9SXjDwEhAikZxGMuW8aU1ZQd8gq",
+    "avatarUrl": "",
+    "bio": "",
+    "createdAt": "2025-12-06T18:40:50.239Z",
+    "verified": false,
+    "verificationToken": "89481e19-84f8-4ee8-aaa7-190bf1dbc851",
+    "walletBalance": 0,
+    "ownedGames": []
   }
 ]

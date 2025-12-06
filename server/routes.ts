@@ -280,12 +280,10 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
-      // Check if user is verified
+      // Check if user is verified - use same error message as invalid credentials to prevent enumeration
       if (!user.verified) {
-        return res.status(403).json({ 
-          message: "Please verify your email address before logging in. Check your inbox for the verification link.",
-          requiresVerification: true,
-          email: user.email
+        return res.status(401).json({ 
+          message: "Invalid email or password"
         });
       }
 
@@ -319,7 +317,8 @@ export async function registerRoutes(
       }
 
       if (user.verified) {
-        return res.status(400).json({ message: "This account is already verified. You can log in." });
+        // Return same generic message to prevent account enumeration
+        return res.json({ message: "If an account exists with this email, a verification link has been sent." });
       }
 
       // Generate a new verification token
