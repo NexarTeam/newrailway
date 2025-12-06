@@ -48,9 +48,7 @@ export default function LoginPage() {
         <div className="bg-[#1A1A1A] rounded-2xl p-8 border border-[#2A2A2A] shadow-2xl">
           <div className="flex flex-col items-center mb-8">
             <NexarLogo size="lg" />
-            <h1 className="text-2xl font-bold text-[#EAEAEA] mt-4 uppercase tracking-wider">
-              NexarID Login
-            </h1>
+            <h1 className="text-2xl font-bold text-[#EAEAEA] mt-4 uppercase tracking-wider">Nexar ID Login</h1>
             <p className="text-[#A3A3A3] text-sm mt-2">
               Sign in to your NexarOS account
             </p>
