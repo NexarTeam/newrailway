@@ -39,29 +39,29 @@ import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 
 const mockLibraryGames: Game[] = [
-  { id: "lib-1", title: "Cyber Assault 2087", isInstalled: true, playTime: 245, size: "45.2 GB", genre: "Action RPG", rating: 4.5 },
-  { id: "lib-2", title: "Stellar Odyssey", isInstalled: true, playTime: 180, size: "32.1 GB", genre: "Adventure", rating: 4.2 },
-  { id: "lib-3", title: "Shadow Protocol", isInstalled: true, playTime: 92, size: "28.7 GB", genre: "Stealth", rating: 4.7 },
-  { id: "lib-4", title: "Neon Drift", isInstalled: true, playTime: 45, size: "18.5 GB", genre: "Racing", rating: 4.0 },
-  { id: "lib-5", title: "Arctic Siege", isInstalled: true, playTime: 210, size: "52.3 GB", genre: "FPS", rating: 4.3 },
-  { id: "lib-6", title: "Phantom Blade", isInstalled: true, playTime: 156, size: "41.0 GB", genre: "Action", rating: 4.6 },
+  { id: "lib-1", title: "Cyber Assault 2087", isInstalled: true, playTime: 245, size: "45.2 GB", genre: "Action RPG", rating: 4.5, contentRating: "M" },
+  { id: "lib-2", title: "Stellar Odyssey", isInstalled: true, playTime: 180, size: "32.1 GB", genre: "Adventure", rating: 4.2, contentRating: "E" },
+  { id: "lib-3", title: "Shadow Protocol", isInstalled: true, playTime: 92, size: "28.7 GB", genre: "Stealth", rating: 4.7, contentRating: "T" },
+  { id: "lib-4", title: "Neon Drift", isInstalled: true, playTime: 45, size: "18.5 GB", genre: "Racing", rating: 4.0, contentRating: "E" },
+  { id: "lib-5", title: "Arctic Siege", isInstalled: true, playTime: 210, size: "52.3 GB", genre: "FPS", rating: 4.3, contentRating: "M" },
+  { id: "lib-6", title: "Phantom Blade", isInstalled: true, playTime: 156, size: "41.0 GB", genre: "Action", rating: 4.6, contentRating: "18+" },
 ];
 
 const mockStoreGames: Game[] = [
-  { id: "store-1", title: "Galactic Frontier", isInstalled: false, size: "58.2 GB", genre: "Adventure", rating: 4.8 },
-  { id: "store-2", title: "Dragon's Legacy", isInstalled: false, size: "72.5 GB", genre: "RPG", rating: 4.9 },
-  { id: "store-3", title: "Urban Legends", isInstalled: false, size: "35.8 GB", genre: "Action", rating: 4.1 },
-  { id: "store-4", title: "Quantum Break", isInstalled: false, size: "44.6 GB", genre: "Adventure", rating: 4.4 },
-  { id: "store-5", title: "Warzone Elite", isInstalled: false, size: "89.2 GB", genre: "FPS", rating: 4.2 },
-  { id: "store-6", title: "Speed Kings", isInstalled: false, size: "25.3 GB", genre: "Racing", rating: 3.9 },
-  { id: "store-7", title: "Empire Builder", isInstalled: false, size: "15.8 GB", genre: "Strategy", rating: 4.5 },
-  { id: "store-8", title: "Championship 2025", isInstalled: false, size: "48.1 GB", genre: "Sports", rating: 4.0 },
+  { id: "store-1", title: "Galactic Frontier", isInstalled: false, size: "58.2 GB", genre: "Adventure", rating: 4.8, contentRating: "T" },
+  { id: "store-2", title: "Dragon's Legacy", isInstalled: false, size: "72.5 GB", genre: "RPG", rating: 4.9, contentRating: "M" },
+  { id: "store-3", title: "Urban Legends", isInstalled: false, size: "35.8 GB", genre: "Action", rating: 4.1, contentRating: "M" },
+  { id: "store-4", title: "Quantum Break", isInstalled: false, size: "44.6 GB", genre: "Adventure", rating: 4.4, contentRating: "T" },
+  { id: "store-5", title: "Warzone Elite", isInstalled: false, size: "89.2 GB", genre: "FPS", rating: 4.2, contentRating: "18+" },
+  { id: "store-6", title: "Speed Kings", isInstalled: false, size: "25.3 GB", genre: "Racing", rating: 3.9, contentRating: "E" },
+  { id: "store-7", title: "Empire Builder", isInstalled: false, size: "15.8 GB", genre: "Strategy", rating: 4.5, contentRating: "E" },
+  { id: "store-8", title: "Championship 2025", isInstalled: false, size: "48.1 GB", genre: "Sports", rating: 4.0, contentRating: "E" },
 ];
 
 const mockFeaturedGames: Game[] = [
-  { id: "feat-1", title: "Neon Uprising", genre: "Cyberpunk Action RPG", isInstalled: false, rating: 4.9 },
-  { id: "feat-2", title: "Galactic Frontier", genre: "Space Exploration", isInstalled: false, rating: 4.8 },
-  { id: "feat-3", title: "Phantom Strike", genre: "Tactical Shooter", isInstalled: true, rating: 4.7 },
+  { id: "feat-1", title: "Neon Uprising", genre: "Cyberpunk Action RPG", isInstalled: false, rating: 4.9, contentRating: "M" },
+  { id: "feat-2", title: "Galactic Frontier", genre: "Space Exploration", isInstalled: false, rating: 4.8, contentRating: "T" },
+  { id: "feat-3", title: "Phantom Strike", genre: "Tactical Shooter", isInstalled: true, rating: 4.7, contentRating: "M" },
 ];
 
 function AuthWrapper({ children }: { children: React.ReactNode }) {
@@ -130,6 +130,11 @@ function NexarOS() {
   ]);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [showUpdateChecker, setShowUpdateChecker] = useState(false);
+  const [parentalBlockModal, setParentalBlockModal] = useState(false);
+  const [parentalBlockReason, setParentalBlockReason] = useState("");
+  const [pendingPlayGame, setPendingPlayGame] = useState<Game | null>(null);
+  const [overridePin, setOverridePin] = useState("");
+  const [overrideLoading, setOverrideLoading] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -176,13 +181,36 @@ function NexarOS() {
     return () => clearInterval(interval);
   }, []);
 
-  const handlePlayGame = useCallback((game: Game) => {
-    toast({
-      title: "Launching Game",
-      description: `Starting ${game.title}...`,
-    });
-    console.log("Playing:", game.title);
-  }, [toast]);
+  const handlePlayGame = useCallback(async (game: Game) => {
+    if (!token) {
+      toast({ title: "Launching Game", description: `Starting ${game.title}...` });
+      return;
+    }
+    
+    try {
+      const response = await fetch("/api/parental/checkAccess", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ gameRating: game.contentRating || "E" }),
+      });
+      const data = await response.json();
+      
+      if (!data.allowed) {
+        setPendingPlayGame(game);
+        setParentalBlockReason(data.reason || "Parental controls are blocking this content.");
+        setParentalBlockModal(true);
+        return;
+      }
+      
+      toast({ title: "Launching Game", description: `Starting ${game.title}...` });
+      console.log("Playing:", game.title);
+    } catch (error) {
+      toast({ title: "Launching Game", description: `Starting ${game.title}...` });
+    }
+  }, [toast, token]);
 
   const handleInstallGame = useCallback((game: Game) => {
     const newDownload: DownloadInfo = {
@@ -212,6 +240,38 @@ function NexarOS() {
     setSelectedGame(game);
   }, []);
 
+  const handleParentalOverride = useCallback(async () => {
+    if (!token || !pendingPlayGame) return;
+    
+    setOverrideLoading(true);
+    try {
+      const response = await fetch("/api/parental/override", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ pin: overridePin }),
+      });
+      
+      if (response.ok) {
+        const gameToLaunch = pendingPlayGame;
+        setParentalBlockModal(false);
+        setOverridePin("");
+        setParentalBlockReason("");
+        setPendingPlayGame(null);
+        toast({ title: "Launching Game", description: `Starting ${gameToLaunch.title}...` });
+        console.log("Playing (override):", gameToLaunch.title);
+      } else {
+        const data = await response.json();
+        toast({ title: "Access Denied", description: data.message || "Invalid PIN", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to verify PIN", variant: "destructive" });
+    } finally {
+      setOverrideLoading(false);
+    }
+  }, [token, pendingPlayGame, overridePin, toast]);
 
   const handlePauseDownload = useCallback((download: DownloadInfo) => {
     setDownloads(prev => prev.map(d => 
@@ -357,6 +417,63 @@ function NexarOS() {
           onDismiss={() => setShowUpdateChecker(false)}
         />
       )}
+
+      <Dialog open={parentalBlockModal} onOpenChange={(open) => {
+        if (!open) {
+          setParentalBlockModal(false);
+          setOverridePin("");
+          setParentalBlockReason("");
+          setPendingPlayGame(null);
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-[#d00024]" />
+              Parental Controls
+            </DialogTitle>
+            <DialogDescription>
+              {parentalBlockReason}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="override-pin">Enter Parent PIN to Override</Label>
+              <Input
+                id="override-pin"
+                type="password"
+                placeholder="Enter PIN"
+                value={overridePin}
+                onChange={(e) => setOverridePin(e.target.value)}
+                maxLength={8}
+                data-testid="input-override-pin"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setParentalBlockModal(false);
+                setOverridePin("");
+                setParentalBlockReason("");
+                setPendingPlayGame(null);
+              }}
+              data-testid="button-cancel-override"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleParentalOverride}
+              disabled={overrideLoading || overridePin.length < 4}
+              className="bg-[#d00024]"
+              data-testid="button-submit-override"
+            >
+              {overrideLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Unlock"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

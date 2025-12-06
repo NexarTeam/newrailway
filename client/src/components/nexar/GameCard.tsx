@@ -21,6 +21,7 @@ export interface Game {
   downloadProgress?: number;
   price?: number;
   isOwned?: boolean;
+  contentRating?: string;
 }
 
 interface GameCardProps {
