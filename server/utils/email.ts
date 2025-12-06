@@ -1,65 +1,16 @@
 import { Resend } from 'resend';
 
-let connectionSettings: any;
-
-async function getCredentials() {
-  console.log('[Email] Getting Resend credentials...');
-  
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  console.log('[Email] REPLIT_CONNECTORS_HOSTNAME:', hostname ? 'set' : 'NOT SET');
-  
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
-
-  console.log('[Email] Token type:', process.env.REPL_IDENTITY ? 'REPL_IDENTITY' : process.env.WEB_REPL_RENEWAL ? 'WEB_REPL_RENEWAL' : 'NONE');
-
-  if (!xReplitToken) {
-    console.error('[Email] ERROR: X_REPLIT_TOKEN not found');
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
-  }
-
-  try {
-    const url = 'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=resend';
-    console.log('[Email] Fetching from connector API...');
-    
-    const response = await fetch(url, {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
-      }
-    });
-    
-    console.log('[Email] Connector API response status:', response.status);
-    
-    const data = await response.json();
-    console.log('[Email] Connector API response:', JSON.stringify(data, null, 2));
-    
-    connectionSettings = data.items?.[0];
-
-    if (!connectionSettings || (!connectionSettings.settings?.api_key)) {
-      console.error('[Email] ERROR: Resend not connected or missing API key');
-      console.error('[Email] connectionSettings:', JSON.stringify(connectionSettings, null, 2));
-      throw new Error('Resend not connected');
-    }
-    
-    console.log('[Email] Successfully got Resend credentials');
-    return {
-      apiKey: connectionSettings.settings.api_key, 
-      fromEmail: connectionSettings.settings.from_email
-    };
-  } catch (error) {
-    console.error('[Email] ERROR fetching credentials:', error);
-    throw error;
-  }
-}
-
 const FROM_EMAIL = 'NexarOS <hello@nexargames.co.uk>';
 
-async function getResendClient() {
-  const { apiKey } = await getCredentials();
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY;
+  
+  if (!apiKey) {
+    console.error('[Email] ERROR: RESEND_API_KEY not set');
+    throw new Error('RESEND_API_KEY not configured');
+  }
+  
+  console.log('[Email] Using RESEND_API_KEY from environment');
   return {
     client: new Resend(apiKey),
     fromEmail: FROM_EMAIL
@@ -70,8 +21,7 @@ export async function sendVerificationEmail(toEmail: string, username: string, v
   console.log('[Email] sendVerificationEmail called for:', toEmail);
   
   try {
-    console.log('[Email] Getting Resend client...');
-    const { client, fromEmail } = await getResendClient();
+    const { client, fromEmail } = getResendClient();
     console.log('[Email] Got client, fromEmail:', fromEmail);
     
     const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] 
@@ -106,6 +56,12 @@ export async function sendVerificationEmail(toEmail: string, username: string, v
     });
     
     console.log('[Email] Resend API response:', JSON.stringify(result, null, 2));
+    
+    if (result.error) {
+      console.error('[Email] Resend returned error:', result.error);
+      return false;
+    }
+    
     return true;
   } catch (error) {
     console.error('[Email] FAILED to send verification email:', error);
@@ -114,8 +70,10 @@ export async function sendVerificationEmail(toEmail: string, username: string, v
 }
 
 export async function sendPasswordResetEmail(toEmail: string, username: string, resetToken: string): Promise<boolean> {
+  console.log('[Email] sendPasswordResetEmail called for:', toEmail);
+  
   try {
-    const { client, fromEmail } = await getResendClient();
+    const { client, fromEmail } = getResendClient();
     
     const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] 
       ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
@@ -123,7 +81,8 @@ export async function sendPasswordResetEmail(toEmail: string, username: string, 
     
     const resetLink = `${baseUrl}/reset-password?token=${resetToken}`;
     
-    await client.emails.send({
+    console.log('[Email] Sending password reset email...');
+    const result = await client.emails.send({
       from: fromEmail,
       to: toEmail,
       subject: 'Reset your NexarOS password',
@@ -143,9 +102,16 @@ export async function sendPasswordResetEmail(toEmail: string, username: string, 
       `
     });
     
+    console.log('[Email] Resend API response:', JSON.stringify(result, null, 2));
+    
+    if (result.error) {
+      console.error('[Email] Resend returned error:', result.error);
+      return false;
+    }
+    
     return true;
   } catch (error) {
-    console.error('Failed to send password reset email:', error);
+    console.error('[Email] FAILED to send password reset email:', error);
     return false;
   }
 }
