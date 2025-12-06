@@ -4,7 +4,7 @@ import { useApi } from "@/hooks/useApi";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Trophy, User, Users, MessageCircle, Cloud, Heart, MessagesSquare, Database, Lock } from "lucide-react";
 
-import firstFriendImage from "@assets/first_friend_ach_1765038288978.png";
+import firstFriendImage from "@assets/first_friend_ach_(1)_1765039658293.png";
 
 const achievementImageMap: Record<string, string> = {
   first_friend: firstFriendImage,

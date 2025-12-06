@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Trophy, MessageCircle, X } from "lucide-react";
 
-import firstFriendImage from "@assets/first_friend_ach_1765038288978.png";
+import firstFriendImage from "@assets/first_friend_ach_(1)_1765039658293.png";
 
 const achievementImageMap: Record<string, string> = {
   first_friend: firstFriendImage,
