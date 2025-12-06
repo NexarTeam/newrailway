@@ -1,0 +1,190 @@
+You are updating NexarOS to include two major systems:
+
+1. Email Verification using Resend.com  
+2. Nexar Wallet + Stripe payment integration  
+
+Implement BOTH fully in frontend and backend.
+
+=====================================================
+        🔴 1. EMAIL VERIFICATION SYSTEM (RESEND)
+=====================================================
+
+INSTALL:
+npm install resend uuid
+
+ENV REQUIRED:
+RESEND_API_KEY="your-key-here"
+
+-------------------------------------------
+UPDATE USER MODEL (backend/data/users.json)
+-------------------------------------------
+Add these fields to every new user:
+{
+  "verified": false,
+  "verificationToken": "",
+  "walletBalance": 0,
+  "transactionHistory": []
+}
+
+-------------------------------------------
+CREATE FILE: backend/utils/email.js
+-------------------------------------------
+Use the Resend SDK:
+
+import { Resend } from 'resend';
+export const resend = new Resend(process.env.RESEND_API_KEY);
+
+export async function sendVerificationEmail(email, token) {
+  const verifyUrl = `${process.env.BACKEND_URL}/auth/verify?token=${token}`;
+
+  await resend.emails.send({
+    from: "NexarOS <no-reply@nexar.gg>",
+    to: email,
+    subject: "Verify Your Nexar Account",
+    html: `
+      <div style="font-family:Arial;background:#0d0d0d;padding:20px;color:white;">
+        <h2 style="color:#ff2222;">Welcome to Nexar</h2>
+        <p>To complete your account setup, verify your email by clicking below:</p>
+        <a href="${verifyUrl}" style="
+          background:#ff2222;padding:12px 18px;color:white;text-decoration:none;
+          border-radius:6px;display:inline-block;margin-top:14px;">
+          Verify My Account
+        </a>
+        <p style="opacity:0.7;margin-top:20px;">If you didn’t create this account, ignore this email.</p>
+      </div>
+    `
+  });
+}
+
+-------------------------------------------
+UPDATE /auth/register
+-------------------------------------------
+- Generate a UUID token for verification
+- Save user with verified:false
+- Send email using sendVerificationEmail()
+
+-------------------------------------------
+CREATE ROUTE: GET /auth/verify?token=XYZ
+-------------------------------------------
+Logic:
+- Find user by token
+- Set verified=true
+- Remove verificationToken
+- Save users.json
+- Respond with success
+
+-------------------------------------------
+UPDATE /auth/login
+-------------------------------------------
+If verified == false → reject login:
+return { error: "Email not verified" }
+
+-------------------------------------------
+FRONTEND CHANGES (React)
+-------------------------------------------
+Pages to add/update:
+
+1. After Register screen:
+   Show message: “Check your inbox to verify your account.”
+
+2. Verification Success Page:
+   Show “Your account has been verified. You may now sign in.”
+
+Redirect back to login.
+
+=====================================================
+        🟩 2. NEXAR WALLET (STRIPE PAYMENTS)
+=====================================================
+
+INSTALL:
+npm install stripe
+
+ENV REQUIRED:
+STRIPE_SECRET_KEY="your-key"
+STRIPE_WEBHOOK_SECRET="your-webhook-secret"
+
+-------------------------------------------
+BACKEND: Create wallet routes
+-------------------------------------------
+
+CREATE /wallet/addFunds
+- Accept: { amount }
+- Create Stripe Checkout Session
+- Return session.url
+Session should include metadata: { userId }
+
+CREATE /wallet/stripeWebhook (POST)
+- Validate webhook signature
+- On checkout.session.completed:
+    - Extract userId
+    - Increase walletBalance by amount
+    - Add entry to transactionHistory:
+      {
+        id,
+        type: "add_funds",
+        amount,
+        timestamp
+      }
+
+CREATE /wallet/balance (GET)
+- Return walletBalance
+
+CREATE /wallet/history (GET)
+- Return transactionHistory
+
+CREATE /wallet/purchase (POST)
+- Accept: { gameId }
+- Look up game price in store metadata
+- If walletBalance < price → reject
+- Deduct price
+- Add purchase record to transactionHistory:
+   { id, type:"purchase", gameId, price, timestamp }
+- Add game to user library
+- Return success
+
+-------------------------------------------
+FRONTEND (React) WALLET UI
+-------------------------------------------
+
+Create WalletPage.jsx:
+- Show wallet balance
+- Show “Add Funds” buttons: £5, £10, £20, £50
+- Clicking opens Stripe Checkout URL
+- Show transaction history
+
+Update Store Game Page:
+- If not owned, show:
+  BUTTON: “Buy for £X”
+  → Calls /wallet/purchase
+- If owned, show:
+  “Owned” + Install Button
+
+-------------------------------------------
+SECURITY REQUIREMENTS
+-------------------------------------------
+- Every wallet route must require a valid JWT
+- Never trust client-side prices
+- Only webhook can modify wallet balance
+- Log all wallet mutations
+- Sanitize all incoming data
+
+=====================================================
+        🔧 FINAL CLEANUP & INTEGRATION CHECK
+=====================================================
+
+After generating code:
+
+1. Full registration → email verification → login must work.
+2. Wallet shows correct balance.
+3. Add Funds must redirect to Stripe.
+4. Webhook must update the wallet.
+5. Purchasing a game must:
+   - Deduct balance  
+   - Add game to library  
+   - Add purchase record  
+
+6. UI must match NexarOS premium dark/red theme.
+
+=====================================================
+Generate updated FULL backend + frontend files.
+=====================================================
