@@ -61,5 +61,14 @@
     "avatarUrl": "",
     "bio": "",
     "createdAt": "2025-12-06T16:13:18.201Z"
+  },
+  {
+    "id": "711b15cf-e5c4-4953-b075-b28fac5ca171",
+    "email": "testtest@test.com",
+    "username": "test",
+    "passwordHash": "$2b$10$ZOXNXp.dFeRnCS2ZhgF0u.pyHwFRNN/cXBFRhAgv9KX.ZOsrFyue2",
+    "avatarUrl": "",
+    "bio": "",
+    "createdAt": "2025-12-06T16:27:58.469Z"
   }
 ]

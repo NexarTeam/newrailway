@@ -4,6 +4,12 @@ import { useApi } from "@/hooks/useApi";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Trophy, User, Users, MessageCircle, Cloud, Heart, MessagesSquare, Database, Lock } from "lucide-react";
 
+import firstFriendImage from "@assets/first_friend_ach_1765038288978.png";
+
+const achievementImageMap: Record<string, string> = {
+  first_friend: firstFriendImage,
+};
+
 interface Achievement {
   id: string;
   name: string;
@@ -97,19 +103,31 @@ export default function AchievementsPage() {
                 }`}
               >
                 <div className="flex items-start gap-4">
-                  <div
-                    className={`w-14 h-14 rounded-xl flex items-center justify-center ${
-                      achievement.unlocked
-                        ? "bg-[#d00024]/20 text-[#d00024]"
-                        : "bg-[#2A2A2A] text-[#666666]"
-                    }`}
-                  >
-                    {achievement.unlocked ? (
-                      <IconComponent className="w-7 h-7" />
-                    ) : (
-                      <Lock className="w-7 h-7" />
-                    )}
-                  </div>
+                  {achievementImageMap[achievement.id] ? (
+                    <div className={`w-16 h-16 rounded-xl overflow-hidden ${
+                      !achievement.unlocked && "opacity-40 grayscale"
+                    }`}>
+                      <img 
+                        src={achievementImageMap[achievement.id]} 
+                        alt={achievement.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      className={`w-14 h-14 rounded-xl flex items-center justify-center ${
+                        achievement.unlocked
+                          ? "bg-[#d00024]/20 text-[#d00024]"
+                          : "bg-[#2A2A2A] text-[#666666]"
+                      }`}
+                    >
+                      {achievement.unlocked ? (
+                        <IconComponent className="w-7 h-7" />
+                      ) : (
+                        <Lock className="w-7 h-7" />
+                      )}
+                    </div>
+                  )}
                   <div className="flex-1">
                     <h3
                       className={`font-semibold text-lg ${
