@@ -29,6 +29,8 @@ import FriendsPage from "@/pages/FriendsPage";
 import MessagesPage from "@/pages/MessagesPage";
 import AchievementsPage from "@/pages/AchievementsPage";
 import CloudSavesPage from "@/pages/CloudSavesPage";
+import WalletPage from "@/pages/WalletPage";
+import VerifyEmailPage from "@/pages/VerifyEmailPage";
 
 const mockLibraryGames: Game[] = [
   { id: "lib-1", title: "Cyber Assault 2087", isInstalled: true, playTime: 245, size: "45.2 GB", genre: "Action RPG", rating: 4.5 },
@@ -66,6 +68,11 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
         <Loader2 className="w-10 h-10 animate-spin text-[#d00024]" />
       </div>
     );
+  }
+
+  // Allow access to verification page without auth
+  if (location.startsWith("/verify")) {
+    return <VerifyEmailPage />;
   }
 
   if (!isAuthenticated) {
@@ -289,6 +296,8 @@ function NexarOS() {
         return <AchievementsPage />;
       case "cloud":
         return <CloudSavesPage />;
+      case "wallet":
+        return <WalletPage />;
       default:
         return null;
     }

@@ -20,6 +20,8 @@ import {
   updateOne,
   deleteOne,
 } from "./utils/fileDb";
+import { sendVerificationEmail } from "./utils/email";
+import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
 // System configuration
 interface SystemConfig {
@@ -86,6 +88,21 @@ interface User {
   avatarUrl: string;
   bio: string;
   createdAt: string;
+  verified: boolean;
+  verificationToken: string;
+  walletBalance: number;
+  ownedGames: string[];
+}
+
+interface WalletTransaction {
+  id: string;
+  userId: string;
+  type: "deposit" | "purchase" | "refund";
+  amount: number;
+  description: string;
+  gameId?: string;
+  stripeSessionId?: string;
+  timestamp: string;
 }
 
 interface FriendRequest {
@@ -194,6 +211,7 @@ export async function registerRoutes(
       }
 
       const passwordHash = await bcrypt.hash(password, 10);
+      const verificationToken = uuidv4();
       const user: User = {
         id: uuidv4(),
         email,
@@ -202,6 +220,10 @@ export async function registerRoutes(
         avatarUrl: "",
         bio: "",
         createdAt: new Date().toISOString(),
+        verified: false,
+        verificationToken,
+        walletBalance: 0,
+        ownedGames: [],
       };
 
       insertOne("users.json", user);
@@ -213,6 +235,10 @@ export async function registerRoutes(
         unlockedAt: new Date().toISOString(),
       });
 
+      sendVerificationEmail(email, username, verificationToken).catch(err => {
+        console.error("Failed to send verification email:", err);
+      });
+
       const token = generateToken({
         userId: user.id,
         email: user.email,
@@ -220,7 +246,7 @@ export async function registerRoutes(
       });
 
       const firstLoginAchievement = ACHIEVEMENTS_LIST.find(a => a.id === "first_login");
-      const { passwordHash: _, ...userWithoutPassword } = user;
+      const { passwordHash: _, verificationToken: __, ...userWithoutPassword } = user;
       res.status(201).json({ 
         user: userWithoutPassword, 
         token,
@@ -775,6 +801,244 @@ export async function registerRoutes(
     }
 
     res.json({ message: "Cloud save deleted" });
+  });
+
+  // ==================== EMAIL VERIFICATION ROUTES ====================
+
+  app.get("/api/auth/verify", async (req, res) => {
+    try {
+      const { token } = req.query;
+
+      if (!token || typeof token !== "string") {
+        return res.status(400).json({ message: "Verification token is required" });
+      }
+
+      const user = findOne<User>("users.json", (u) => u.verificationToken === token);
+      if (!user) {
+        return res.status(400).json({ message: "Invalid verification token" });
+      }
+
+      if (user.verified) {
+        return res.json({ message: "Email already verified" });
+      }
+
+      updateOne<User>("users.json", (u) => u.id === user.id, { verified: true, verificationToken: undefined });
+      res.json({ message: "Email verified successfully" });
+    } catch (error) {
+      console.error("Verification error:", error);
+      res.status(500).json({ message: "Verification failed" });
+    }
+  });
+
+  app.post("/api/auth/resend-verification", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (user.verified) {
+        return res.status(400).json({ message: "Email already verified" });
+      }
+
+      const newToken = uuidv4();
+      updateOne<User>("users.json", (u) => u.id === user.id, { verificationToken: newToken });
+
+      const sent = await sendVerificationEmail(user.email, user.username, newToken);
+      if (!sent) {
+        return res.status(500).json({ message: "Failed to send verification email" });
+      }
+
+      res.json({ message: "Verification email sent" });
+    } catch (error) {
+      console.error("Resend verification error:", error);
+      res.status(500).json({ message: "Failed to send verification email" });
+    }
+  });
+
+  // ==================== WALLET ROUTES ====================
+
+  app.get("/api/wallet", authMiddleware, (req: AuthenticatedRequest, res) => {
+    const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const transactions = findMany<WalletTransaction>("wallet_transactions.json", (t) => t.userId === req.user!.userId);
+    transactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    res.json({
+      balance: user.walletBalance || 0,
+      transactions,
+      ownedGames: user.ownedGames || [],
+    });
+  });
+
+  app.get("/api/wallet/stripe-key", async (req, res) => {
+    try {
+      const publishableKey = await getStripePublishableKey();
+      res.json({ publishableKey });
+    } catch (error) {
+      console.error("Failed to get Stripe key:", error);
+      res.status(500).json({ message: "Failed to get payment configuration" });
+    }
+  });
+
+  app.post("/api/wallet/create-checkout", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { amount } = req.body;
+      
+      if (!amount || amount < 5 || amount > 100) {
+        return res.status(400).json({ message: "Amount must be between $5 and $100" });
+      }
+
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      
+      const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] 
+        ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+        : 'http://localhost:5000';
+
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [{
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'NexarOS Wallet Funds',
+              description: `Add $${amount} to your NexarOS wallet`,
+            },
+            unit_amount: amount * 100,
+          },
+          quantity: 1,
+        }],
+        mode: 'payment',
+        success_url: `${baseUrl}/wallet?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/wallet?canceled=true`,
+        metadata: {
+          userId: user.id,
+          type: 'wallet_deposit',
+          amount: amount.toString(),
+        },
+      });
+
+      res.json({ url: session.url, sessionId: session.id });
+    } catch (error) {
+      console.error("Checkout error:", error);
+      res.status(500).json({ message: "Failed to create checkout session" });
+    }
+  });
+
+  app.post("/api/wallet/verify-payment", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { sessionId } = req.body;
+      
+      if (!sessionId) {
+        return res.status(400).json({ message: "Session ID is required" });
+      }
+
+      const existingTransaction = findOne<WalletTransaction>("wallet_transactions.json", 
+        (t) => t.stripeSessionId === sessionId
+      );
+      if (existingTransaction) {
+        return res.json({ message: "Payment already processed", balance: existingTransaction.amount });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+      if (session.payment_status !== 'paid') {
+        return res.status(400).json({ message: "Payment not completed" });
+      }
+
+      if (session.metadata?.userId !== req.user!.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const amount = parseInt(session.metadata?.amount || '0');
+      if (amount <= 0) {
+        return res.status(400).json({ message: "Invalid amount" });
+      }
+
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const newBalance = (user.walletBalance || 0) + amount;
+      updateOne<User>("users.json", (u) => u.id === user.id, { walletBalance: newBalance });
+
+      const transaction: WalletTransaction = {
+        id: uuidv4(),
+        userId: user.id,
+        type: "deposit",
+        amount,
+        description: `Added $${amount} to wallet`,
+        stripeSessionId: sessionId,
+        timestamp: new Date().toISOString(),
+      };
+      insertOne("wallet_transactions.json", transaction);
+
+      res.json({ message: "Payment verified", balance: newBalance });
+    } catch (error) {
+      console.error("Payment verification error:", error);
+      res.status(500).json({ message: "Failed to verify payment" });
+    }
+  });
+
+  app.post("/api/wallet/purchase-game", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { gameId, price, gameName } = req.body;
+      
+      if (!gameId || price === undefined || !gameName) {
+        return res.status(400).json({ message: "Game ID, price, and name are required" });
+      }
+
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if ((user.ownedGames || []).includes(gameId)) {
+        return res.status(400).json({ message: "You already own this game" });
+      }
+
+      if ((user.walletBalance || 0) < price) {
+        return res.status(400).json({ message: "Insufficient wallet balance" });
+      }
+
+      const newBalance = (user.walletBalance || 0) - price;
+      const newOwnedGames = [...(user.ownedGames || []), gameId];
+      
+      updateOne<User>("users.json", (u) => u.id === user.id, { 
+        walletBalance: newBalance,
+        ownedGames: newOwnedGames,
+      });
+
+      const transaction: WalletTransaction = {
+        id: uuidv4(),
+        userId: user.id,
+        type: "purchase",
+        amount: -price,
+        description: `Purchased ${gameName}`,
+        gameId,
+        timestamp: new Date().toISOString(),
+      };
+      insertOne("wallet_transactions.json", transaction);
+
+      res.json({ 
+        message: "Game purchased successfully", 
+        balance: newBalance,
+        ownedGames: newOwnedGames,
+      });
+    } catch (error) {
+      console.error("Purchase error:", error);
+      res.status(500).json({ message: "Failed to purchase game" });
+    }
   });
 
   return httpServer;

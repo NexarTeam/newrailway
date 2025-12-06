@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Play, Download, MoreVertical, Clock, Gamepad2 } from "lucide-react";
+import { Play, Download, MoreVertical, Clock, Gamepad2, ShoppingCart, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -19,6 +19,8 @@ export interface Game {
   rating?: number;
   genre?: string;
   downloadProgress?: number;
+  price?: number;
+  isOwned?: boolean;
 }
 
 interface GameCardProps {
@@ -27,6 +29,7 @@ interface GameCardProps {
   onInstall?: (game: Game) => void;
   onDelete?: (game: Game) => void;
   onManage?: (game: Game) => void;
+  onBuy?: (game: Game) => void;
   variant?: "default" | "compact" | "horizontal";
 }
 
@@ -36,6 +39,7 @@ export default function GameCard({
   onInstall,
   onDelete,
   onManage,
+  onBuy,
   variant = "default"
 }: GameCardProps) {
   const isDownloading = game.downloadProgress !== undefined && game.downloadProgress < 100;
@@ -137,6 +141,23 @@ export default function GameCard({
           </div>
         )}
 
+        {game.isOwned && (
+          <div className="absolute top-2 right-2">
+            <Badge variant="secondary" className="bg-green-600 text-white gap-1">
+              <Check className="w-3 h-3" />
+              Owned
+            </Badge>
+          </div>
+        )}
+
+        {game.price !== undefined && !game.isOwned && (
+          <div className="absolute top-2 left-2">
+            <Badge variant="default" className="bg-primary text-primary-foreground">
+              ${game.price.toFixed(2)}
+            </Badge>
+          </div>
+        )}
+
         <motion.div 
           className="absolute inset-0 flex items-center justify-center bg-black/60"
           initial={{ opacity: 0 }}
@@ -146,7 +167,18 @@ export default function GameCard({
           <Button 
             size="lg" 
             className="rounded-full shadow-xl"
-            onClick={() => game.isInstalled ? onPlay?.(game) : onInstall?.(game)}
+            onClick={() => {
+              if (isDownloading) return;
+              if (game.isInstalled) {
+                onPlay?.(game);
+              } else if (game.isOwned) {
+                onInstall?.(game);
+              } else if (game.price !== undefined && onBuy) {
+                onBuy(game);
+              } else {
+                onInstall?.(game);
+              }
+            }}
             data-testid={`button-action-${game.id}`}
           >
             {isDownloading ? (
@@ -155,6 +187,16 @@ export default function GameCard({
               <>
                 <Play className="w-5 h-5 mr-2" />
                 Play
+              </>
+            ) : game.isOwned ? (
+              <>
+                <Download className="w-5 h-5 mr-2" />
+                Install
+              </>
+            ) : game.price !== undefined ? (
+              <>
+                <ShoppingCart className="w-5 h-5 mr-2" />
+                Buy ${game.price.toFixed(2)}
               </>
             ) : (
               <>
