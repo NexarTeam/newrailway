@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Play, Download, MoreVertical, Clock, Gamepad2, ShoppingCart, Check } from "lucide-react";
+import { Play, Download, MoreVertical, Clock, Gamepad2, ShoppingCart, Check, Crown, Percent } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -22,6 +22,11 @@ export interface Game {
   price?: number;
   isOwned?: boolean;
   contentRating?: string;
+  discountPercent?: number;
+  originalPrice?: number;
+  hasTrial?: boolean;
+  trialMinutes?: number;
+  isNexarPlusGame?: boolean;
 }
 
 interface GameCardProps {
@@ -151,8 +156,44 @@ export default function GameCard({
           </div>
         )}
 
-        {game.price !== undefined && !game.isOwned && (
+        {game.isNexarPlusGame && !game.isOwned && (
+          <div className="absolute top-2 right-2">
+            <Badge variant="secondary" className="bg-amber-500 text-white gap-1">
+              <Crown className="w-3 h-3" />
+              Nexar+
+            </Badge>
+          </div>
+        )}
+
+        {game.hasTrial && !game.isOwned && !game.isNexarPlusGame && (
+          <div className="absolute top-2 right-2">
+            <Badge variant="secondary" className="bg-blue-500 text-white gap-1">
+              <Play className="w-3 h-3" />
+              Try Free
+            </Badge>
+          </div>
+        )}
+
+        {game.discountPercent && game.discountPercent > 0 && !game.isOwned && (
+          <div className="absolute top-2 left-2 flex flex-col gap-1">
+            <Badge variant="default" className="bg-green-600 text-white gap-1">
+              <Percent className="w-3 h-3" />
+              -{game.discountPercent}%
+            </Badge>
+          </div>
+        )}
+
+        {game.price !== undefined && !game.isOwned && !game.discountPercent && (
           <div className="absolute top-2 left-2">
+            <Badge variant="default" className="bg-primary text-primary-foreground">
+              £{game.price.toFixed(2)}
+            </Badge>
+          </div>
+        )}
+
+        {game.price !== undefined && game.originalPrice && game.discountPercent && !game.isOwned && (
+          <div className="absolute bottom-16 left-2 flex items-center gap-2">
+            <span className="text-xs text-muted-foreground line-through">£{game.originalPrice.toFixed(2)}</span>
             <Badge variant="default" className="bg-primary text-primary-foreground">
               £{game.price.toFixed(2)}
             </Badge>

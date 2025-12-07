@@ -31,6 +31,19 @@ interface WalletData {
   ownedGames: string[];
 }
 
+interface GameMetadata {
+  gameId: string;
+  trialEnabled?: boolean;
+  trialMinutes?: number;
+  nexarPlusDiscount?: number;
+  inNexarPlusCollection?: boolean;
+}
+
+interface SubscriptionStatus {
+  hasActiveSubscription: boolean;
+  status?: string;
+}
+
 const categories = [
   { id: "all", label: "All Games" },
   { id: "action", label: "Action" },
@@ -66,9 +79,15 @@ export default function StorePage({
   const [isLoadingWallet, setIsLoadingWallet] = useState(true);
   const [buyDialog, setBuyDialog] = useState<{ open: boolean; game: Game | null }>({ open: false, game: null });
   const [isPurchasing, setIsPurchasing] = useState(false);
+  const [gameMetadata, setGameMetadata] = useState<GameMetadata[]>([]);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
 
   useEffect(() => {
     loadWallet();
+    loadGameMetadata();
+    if (token) {
+      loadSubscriptionStatus();
+    }
   }, [token]);
 
   const loadWallet = async () => {
@@ -88,13 +107,55 @@ export default function StorePage({
     }
   };
 
+  const loadGameMetadata = async () => {
+    try {
+      const data = await get<{ games: GameMetadata[] }>("/api/games/metadata");
+      if (data?.games) {
+        setGameMetadata(data.games);
+      }
+    } catch (error) {
+      console.error("Failed to load game metadata:", error);
+    }
+  };
+
+  const loadSubscriptionStatus = async () => {
+    try {
+      const data = await get<SubscriptionStatus>("/api/subscription/status");
+      if (data) {
+        setSubscriptionStatus(data);
+      }
+    } catch (error) {
+      console.error("Failed to load subscription status:", error);
+    }
+  };
+
   const gamesWithPricesAndOwnership = useMemo(() => {
-    return storeGames.map(game => ({
-      ...game,
-      price: gamePrices[game.id] || 29.99,
-      isOwned: walletData?.ownedGames?.includes(game.id) || false,
-    }));
-  }, [storeGames, walletData]);
+    const hasSubscription = subscriptionStatus?.hasActiveSubscription || false;
+    
+    return storeGames.map(game => {
+      const basePrice = gamePrices[game.id] || 29.99;
+      const metadata = gameMetadata.find(m => m.gameId === game.id);
+      
+      let finalPrice = basePrice;
+      let discountPercent = 0;
+      
+      if (hasSubscription && metadata?.nexarPlusDiscount) {
+        discountPercent = metadata.nexarPlusDiscount;
+        finalPrice = Math.round(basePrice * (1 - discountPercent / 100) * 100) / 100;
+      }
+      
+      return {
+        ...game,
+        price: finalPrice,
+        originalPrice: discountPercent > 0 ? basePrice : undefined,
+        discountPercent: discountPercent > 0 ? discountPercent : undefined,
+        isOwned: walletData?.ownedGames?.includes(game.id) || false,
+        hasTrial: metadata?.trialEnabled || false,
+        trialMinutes: metadata?.trialMinutes,
+        isNexarPlusGame: metadata?.inNexarPlusCollection || false,
+      };
+    });
+  }, [storeGames, walletData, gameMetadata, subscriptionStatus]);
 
   const filteredGames = useMemo(() => {
     let result = [...gamesWithPricesAndOwnership];
@@ -297,6 +358,15 @@ export default function StorePage({
               <span className="text-sm text-muted-foreground">Your Balance:</span>
               <span className="font-semibold">£{(walletData?.balance || 0).toFixed(2)}</span>
             </div>
+            {buyDialog.game?.discountPercent && buyDialog.game?.originalPrice && (
+              <div className="flex justify-between items-center p-3 rounded-lg bg-green-500/10 border border-green-500/30 mt-2">
+                <span className="text-sm text-green-500 font-medium">Nexar+ Discount ({buyDialog.game.discountPercent}%):</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground line-through">£{buyDialog.game.originalPrice.toFixed(2)}</span>
+                  <span className="font-semibold text-green-500">-£{(buyDialog.game.originalPrice - (buyDialog.game.price || 0)).toFixed(2)}</span>
+                </div>
+              </div>
+            )}
             <div className="flex justify-between items-center p-3 rounded-lg bg-muted mt-2">
               <span className="text-sm text-muted-foreground">Game Price:</span>
               <span className="font-semibold text-primary">£{buyDialog.game?.price?.toFixed(2)}</span>

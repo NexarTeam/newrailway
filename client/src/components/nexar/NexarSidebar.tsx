@@ -1,11 +1,11 @@
 import { motion } from "framer-motion";
-import { Home, Library, ShoppingBag, Download, Settings, Gamepad2, User, Users, MessageCircle, Trophy, Cloud, LogOut, Wallet } from "lucide-react";
+import { Home, Library, ShoppingBag, Download, Settings, Gamepad2, User, Users, MessageCircle, Trophy, Cloud, LogOut, Wallet, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import NexarLogo from "./NexarLogo";
 
-export type NavPage = "home" | "library" | "store" | "downloads" | "settings" | "profile" | "friends" | "messages" | "achievements" | "cloud" | "wallet";
+export type NavPage = "home" | "library" | "store" | "downloads" | "settings" | "profile" | "friends" | "messages" | "achievements" | "cloud" | "wallet" | "nexarplus";
 
 interface NexarSidebarProps {
   currentPage: NavPage;
@@ -21,6 +21,7 @@ const navItems: { id: NavPage; label: string; icon: typeof Home }[] = [
   { id: "library", label: "Library", icon: Library },
   { id: "store", label: "Store", icon: ShoppingBag },
   { id: "downloads", label: "Downloads", icon: Download },
+  { id: "nexarplus", label: "Nexar+", icon: Crown },
 ];
 
 const nexarIdItems: { id: NavPage; label: string; icon: typeof Home }[] = [

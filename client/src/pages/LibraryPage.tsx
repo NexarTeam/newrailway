@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Filter, Grid, List, SortAsc } from "lucide-react";
+import { Search, Filter, Grid, List, SortAsc, Crown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import GameCard, { type Game } from "@/components/nexar/GameCard";
+import { useAuth } from "@/hooks/useAuth";
+import { useApi } from "@/hooks/useApi";
 
 interface LibraryPageProps {
   games: Game[];
@@ -20,18 +22,72 @@ interface LibraryPageProps {
   onViewGameDetails: (game: Game) => void;
 }
 
+interface NexarPlusGame {
+  id: string;
+  title: string;
+  coverUrl?: string;
+}
+
+const NEXAR_PLUS_COLLECTION: NexarPlusGame[] = [
+  { id: "store-7", title: "Phantom Protocol", coverUrl: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=600&fit=crop" },
+  { id: "store-8", title: "Eternal Realms", coverUrl: "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=400&h=600&fit=crop" },
+];
+
 export default function LibraryPage({
   games,
   onPlayGame,
   onDeleteGame,
   onViewGameDetails
 }: LibraryPageProps) {
+  const { token } = useAuth();
+  const { get } = useApi();
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [filter, setFilter] = useState<"all" | "installed">("all");
+  const [filter, setFilter] = useState<"all" | "installed" | "nexarplus">("all");
   const [sortBy, setSortBy] = useState<"name" | "recent" | "playtime">("recent");
+  const [hasSubscription, setHasSubscription] = useState(false);
+
+  useEffect(() => {
+    if (token) {
+      loadSubscriptionStatus();
+    }
+  }, [token]);
+
+  const loadSubscriptionStatus = async () => {
+    try {
+      const data = await get<{ hasActiveSubscription: boolean }>("/api/subscription/status");
+      if (data) {
+        setHasSubscription(data.hasActiveSubscription);
+      }
+    } catch (error) {
+      console.error("Failed to load subscription status:", error);
+    }
+  };
+
+  const nexarPlusGames = useMemo(() => {
+    if (!hasSubscription) return [];
+    return NEXAR_PLUS_COLLECTION.map(npg => ({
+      ...npg,
+      isInstalled: games.some(g => g.id === npg.id && g.isInstalled),
+      isNexarPlusGame: true,
+      isOwned: true,
+    }));
+  }, [hasSubscription, games]);
 
   const filteredGames = useMemo(() => {
+    if (filter === "nexarplus") {
+      let result = [...nexarPlusGames];
+      if (searchQuery) {
+        result = result.filter(g => 
+          g.title.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      }
+      if (sortBy === "name") {
+        result.sort((a, b) => a.title.localeCompare(b.title));
+      }
+      return result;
+    }
+
     let result = [...games];
 
     if (searchQuery) {
@@ -51,7 +107,7 @@ export default function LibraryPage({
     }
 
     return result;
-  }, [games, searchQuery, filter, sortBy]);
+  }, [games, searchQuery, filter, sortBy, nexarPlusGames]);
 
   return (
     <motion.div
@@ -105,6 +161,12 @@ export default function LibraryPage({
           <TabsList>
             <TabsTrigger value="all" data-testid="tab-all">All Games</TabsTrigger>
             <TabsTrigger value="installed" data-testid="tab-installed">Installed</TabsTrigger>
+            {hasSubscription && (
+              <TabsTrigger value="nexarplus" data-testid="tab-nexarplus" className="gap-1">
+                <Crown className="w-3 h-3" />
+                Nexar+ Collection
+              </TabsTrigger>
+            )}
           </TabsList>
         </Tabs>
 
@@ -136,7 +198,9 @@ export default function LibraryPage({
             <p className="text-muted-foreground">
               {searchQuery 
                 ? "Try adjusting your search or filters" 
-                : "Your Nexar Library is empty. Install games from the Nexar Store."}
+                : filter === "nexarplus"
+                  ? "No Nexar+ Collection games found."
+                  : "Your Nexar Library is empty. Install games from the Nexar Store."}
             </p>
           </motion.div>
         ) : viewMode === "grid" ? (

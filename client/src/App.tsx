@@ -37,6 +37,7 @@ import WalletPage from "@/pages/WalletPage";
 import VerifyEmailPage from "@/pages/VerifyEmailPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import NexarPlusPage from "@/pages/NexarPlusPage";
 
 const mockLibraryGames: Game[] = [
   { id: "lib-1", title: "Cyber Assault 2087", isInstalled: true, playTime: 245, size: "45.2 GB", genre: "Action RPG", rating: 4.5, contentRating: "M" },
@@ -370,6 +371,8 @@ function NexarOS() {
         return <CloudSavesPage />;
       case "wallet":
         return <WalletPage />;
+      case "nexarplus":
+        return <NexarPlusPage />;
       default:
         return null;
     }

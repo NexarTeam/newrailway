@@ -1176,7 +1176,6 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Game not found in catalog" });
       }
 
-      const canonicalPrice = gameData.price;
       const gameName = gameData.name;
 
       const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
@@ -1188,11 +1187,21 @@ export async function registerRoutes(
         return res.status(400).json({ message: "You already own this game" });
       }
 
-      if ((user.walletBalance || 0) < canonicalPrice) {
+      // Calculate price with Nexar+ discount if applicable
+      let finalPrice = gameData.price;
+      let discountApplied = 0;
+      
+      if (user.subscription?.active && gameData.nexarPlusDiscount) {
+        discountApplied = gameData.nexarPlusDiscount;
+        finalPrice = gameData.price * (1 - discountApplied / 100);
+        finalPrice = Math.round(finalPrice * 100) / 100; // Round to 2 decimal places
+      }
+
+      if ((user.walletBalance || 0) < finalPrice) {
         return res.status(400).json({ message: "Insufficient wallet balance" });
       }
 
-      const newBalance = (user.walletBalance || 0) - canonicalPrice;
+      const newBalance = (user.walletBalance || 0) - finalPrice;
       const newOwnedGames = [...(user.ownedGames || []), gameId];
       
       updateOne<User>("users.json", (u) => u.id === user.id, { 
@@ -1200,12 +1209,13 @@ export async function registerRoutes(
         ownedGames: newOwnedGames,
       });
 
+      const discountText = discountApplied > 0 ? ` (${discountApplied}% Nexar+ discount)` : "";
       const transaction: WalletTransaction = {
         id: uuidv4(),
         userId: user.id,
         type: "purchase",
-        amount: -canonicalPrice,
-        description: `Purchased ${gameName}`,
+        amount: -finalPrice,
+        description: `Purchased ${gameName}${discountText}`,
         gameId,
         timestamp: new Date().toISOString(),
       };
@@ -1215,6 +1225,9 @@ export async function registerRoutes(
         message: "Game purchased successfully", 
         balance: newBalance,
         ownedGames: newOwnedGames,
+        discountApplied,
+        originalPrice: gameData.price,
+        finalPrice,
       });
     } catch (error) {
       console.error("Purchase error:", error);

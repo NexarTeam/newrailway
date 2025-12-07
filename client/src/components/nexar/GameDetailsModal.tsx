@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Play, Download, Trash2, Star, Clock, HardDrive, Tag, Gamepad2 } from "lucide-react";
+import { X, Play, Download, Trash2, Star, Clock, HardDrive, Tag, Gamepad2, Crown, Percent } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -83,8 +83,32 @@ export default function GameDetailsModal({
                     {game.isInstalled && (
                       <Badge variant="outline" className="border-green-500 text-green-500">Installed</Badge>
                     )}
+                    {game.isNexarPlusGame && (
+                      <Badge variant="secondary" className="bg-amber-500 text-white gap-1">
+                        <Crown className="w-3 h-3" />
+                        Nexar+ Game
+                      </Badge>
+                    )}
+                    {game.hasTrial && !game.isOwned && (
+                      <Badge variant="secondary" className="bg-blue-500 text-white gap-1">
+                        <Play className="w-3 h-3" />
+                        {game.trialMinutes ? `${game.trialMinutes} min Trial` : 'Free Trial'}
+                      </Badge>
+                    )}
+                    {game.discountPercent && game.discountPercent > 0 && (
+                      <Badge variant="secondary" className="bg-green-600 text-white gap-1">
+                        <Percent className="w-3 h-3" />
+                        -{game.discountPercent}% Nexar+ Discount
+                      </Badge>
+                    )}
                   </div>
                   <h2 className="text-2xl font-bold text-foreground">{game.title}</h2>
+                  {game.discountPercent && game.originalPrice && game.price !== undefined && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-muted-foreground line-through">£{game.originalPrice.toFixed(2)}</span>
+                      <span className="text-lg font-bold text-green-500">£{game.price.toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
 
                 {isDownloading && (
