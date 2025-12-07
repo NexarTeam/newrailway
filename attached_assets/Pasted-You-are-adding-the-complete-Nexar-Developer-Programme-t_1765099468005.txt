@@ -1,0 +1,316 @@
+You are adding the complete Nexar Developer Programme to NexarOS.
+This includes: developer roles, developer applications, developer dashboard, game submission tools, metadata handling, and admin approval system.
+
+Implement everything exactly as defined below.
+
+=====================================================
+🔴 UPDATE USER MODEL
+
+Modify the user model (users.json or DB later) to include developer fields:
+
+Add to each user:
+
+"role": "user", // default; can become "developer"
+"developerProfile": {
+"studioName": "",
+"website": "",
+"description": "",
+"contactEmail": "",
+"status": "none" // none, pending, approved, rejected
+}
+
+=====================================================
+🔴 CREATE DEVELOPER APPLICATION SYSTEM
+
+Developers must apply before becoming approved.
+
+Create new backend routes:
+
+POST /developer/apply
+Body:
+{
+"studioName": "",
+"contactEmail": "",
+"website": "",
+"description": ""
+}
+
+Logic:
+
+User must be logged in
+
+Validate required fields
+
+If user already has status "pending" or "approved", prevent duplicate application
+
+Set developerProfile fields and status = "pending"
+
+Save changes to user
+
+Return:
+{ success: true, message: "Application submitted" }
+
+GET /developer/status
+
+Returns the logged-in user developerProfile + role
+
+=====================================================
+🔴 ADMIN REVIEW (TEMPORARY SYSTEM)
+
+Create simple admin routes (manual for now):
+
+POST /admin/developer/approve
+POST /admin/developer/reject
+
+Body: { userId }
+
+Approve:
+
+Set role = "developer"
+
+Set developerProfile.status = "approved"
+
+Reject:
+
+Set developerProfile.status = "rejected"
+
+=====================================================
+🔴 DEVELOPER GAME METADATA SYSTEM
+
+Developers need to submit game entries, but file upload is not yet required.
+
+Create a backend store: backend/data/developerGames.json
+
+Each entry:
+
+{
+"gameId": "generated",
+"developerId": "userid",
+"title": "",
+"description": "",
+"price": 0,
+"genre": "",
+"tags": [],
+"status": "draft", // draft, pending, approved, rejected
+"versions": [], // future file uploads
+"createdAt": "",
+"updatedAt": ""
+}
+
+POST /developer/game/create
+Body:
+{
+"title": "",
+"description": "",
+"price": number,
+"genre": "",
+"tags": []
+}
+
+Logic:
+
+Must be developer (role=developer & status=approved)
+
+Generate unique gameId
+
+Create new game record with status "draft"
+
+Store game entry
+
+Return new game data.
+
+POST /developer/game/update
+Body:
+{
+"gameId": "",
+"title": "",
+"description": "",
+"price": number,
+"genre": "",
+"tags": []
+}
+
+Logic:
+
+Only the game's creator can edit
+
+Update metadata
+
+Save changes
+
+POST /developer/game/submitForReview
+Body: { "gameId": "" }
+
+Logic:
+
+Set game.status = "pending"
+
+Notify admin (placeholder)
+
+GET /developer/games
+
+Return all games created by the logged-in developer
+
+=====================================================
+🔴 ADMIN GAME APPROVAL SYSTEM
+
+Add routes:
+
+POST /admin/game/approve
+POST /admin/game/reject
+
+Body:
+{ "gameId": "" }
+
+Approve:
+
+Set game.status = "approved"
+
+Reject:
+
+Set game.status = "rejected"
+
+=====================================================
+🔴 INTEGRATE DEVELOPER GAMES INTO STORE
+
+Modify the main Nexar store logic:
+
+Only show games where status = "approved"
+
+When a game is approved, move the entry into store metadata (or mark approved)
+
+=====================================================
+🔴 FRONTEND UI IMPLEMENTATION
+
+Add new navigation section:
+
+Sidebar:
+
+"Developer Portal" (visible only if dev is approved or pending)
+
+"Apply as Developer" (if normal user)
+
+🔵 PAGE 1: Developer Application Page
+Path: /developer/apply
+
+Fields:
+
+Studio name
+
+Contact email
+
+Website
+
+Description
+
+Button: Submit Application
+→ calls POST /developer/apply
+
+If status=pending:
+Show “Application pending review.”
+
+If rejected:
+Show “Application rejected.”
+
+🔵 PAGE 2: Developer Dashboard
+Path: /developer/dashboard
+Visible only if user.role = developer AND status = approved.
+
+Tabs:
+
+My Games
+
+Upload / Create Game
+
+Documentation
+
+Earnings (placeholder)
+
+🔵 PAGE 3: My Games
+Shows list of all dev-submitted games.
+
+Each game card:
+
+Title
+
+Price
+
+Status
+
+Buttons:
+
+Edit
+
+Submit for Review
+
+🔵 PAGE 4: Create / Edit Game
+Fields:
+
+Title
+
+Description
+
+Price
+
+Genre
+
+Tags (comma separated)
+
+Buttons:
+
+Save Changes
+
+Submit for Review (if status=draft)
+
+🔵 PAGE 5: Developer Documentation
+Include pages explaining:
+
+Nexar packaging format (placeholder)
+
+Metadata rules
+
+Pricing rules
+
+Submission process
+
+Nexar+ eligibility (future)
+
+🔵 PAGE 6: Developer Earnings (placeholder)
+Show:
+
+Estimated revenue = price * 0.90
+
+Actual payout system to come later
+
+=====================================================
+🔴 SECURITY REQUIREMENTS
+
+Only approved developers may access developer dashboard
+
+Only developers can create/edit games
+
+Only admins can approve developers & games
+
+All routes must require JWT authentication
+
+=====================================================
+🔴 FINAL INTEGRATION CHECK
+
+Ensure:
+
+Developer application works correctly
+
+Developer status persists in user model
+
+Developer dashboard is visible only after approval
+
+New games can be created, edited, and submitted for review
+
+Admin approval updates store visibility
+
+Frontend pages use NexarOS UI theme and components
+
+JSON or DB storage is correctly updated
+
+=====================================================
+Generate ALL backend routes, updated user model, new frontend pages, navigation updates, and example entries.

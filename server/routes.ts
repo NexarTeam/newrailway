@@ -107,6 +107,14 @@ interface TrialUsage {
   };
 }
 
+interface DeveloperProfile {
+  studioName: string;
+  website: string;
+  description: string;
+  contactEmail: string;
+  status: "none" | "pending" | "approved" | "rejected";
+}
+
 interface User {
   id: string;
   email: string;
@@ -124,6 +132,23 @@ interface User {
   parentalControls?: ParentalControls;
   subscription?: Subscription;
   trialUsage?: TrialUsage;
+  role: "user" | "developer" | "admin";
+  developerProfile?: DeveloperProfile;
+}
+
+interface DeveloperGame {
+  gameId: string;
+  developerId: string;
+  title: string;
+  description: string;
+  price: number;
+  genre: string;
+  tags: string[];
+  status: "draft" | "pending" | "approved" | "rejected";
+  versions: string[];
+  createdAt: string;
+  updatedAt: string;
+  coverImage?: string;
 }
 
 interface WalletTransaction {
@@ -279,6 +304,7 @@ export async function registerRoutes(
         verificationToken,
         walletBalance: 0,
         ownedGames: [],
+        role: "user",
       };
 
       insertOne("users.json", user);
@@ -1860,6 +1886,494 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Get price error:", error);
       res.status(500).json({ message: "Failed to get price" });
+    }
+  });
+
+  // ========================================
+  // DEVELOPER PROGRAMME ROUTES
+  // ========================================
+
+  // Apply as developer
+  app.post("/api/developer/apply", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const { studioName, contactEmail, website, description } = req.body;
+
+      if (!studioName || !contactEmail || !description) {
+        return res.status(400).json({ message: "Studio name, contact email, and description are required" });
+      }
+
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (user.developerProfile?.status === "pending") {
+        return res.status(400).json({ message: "You already have a pending application" });
+      }
+
+      if (user.developerProfile?.status === "approved") {
+        return res.status(400).json({ message: "You are already an approved developer" });
+      }
+
+      const developerProfile: DeveloperProfile = {
+        studioName,
+        contactEmail,
+        website: website || "",
+        description,
+        status: "pending",
+      };
+
+      updateOne<User>("users.json", (u) => u.id === req.user!.userId, {
+        developerProfile,
+      });
+
+      res.json({ success: true, message: "Application submitted successfully" });
+    } catch (error) {
+      console.error("Developer apply error:", error);
+      res.status(500).json({ message: "Failed to submit application" });
+    }
+  });
+
+  // Get developer status
+  app.get("/api/developer/status", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({
+        role: user.role || "user",
+        developerProfile: user.developerProfile || null,
+      });
+    } catch (error) {
+      console.error("Developer status error:", error);
+      res.status(500).json({ message: "Failed to get developer status" });
+    }
+  });
+
+  // Admin: Get all developer applications
+  app.get("/api/admin/developer/applications", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const adminUser = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!adminUser || adminUser.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const applications = findMany<User>("users.json", (u) => 
+        u.developerProfile?.status === "pending"
+      ).map(u => ({
+        userId: u.id,
+        username: u.username,
+        email: u.email,
+        developerProfile: u.developerProfile,
+        createdAt: u.createdAt,
+      }));
+
+      res.json(applications);
+    } catch (error) {
+      console.error("Get applications error:", error);
+      res.status(500).json({ message: "Failed to get applications" });
+    }
+  });
+
+  // Admin: Approve developer
+  app.post("/api/admin/developer/approve", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const { userId } = req.body;
+
+      const adminUser = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!adminUser || adminUser.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+
+      const targetUser = findOne<User>("users.json", (u) => u.id === userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (!targetUser.developerProfile) {
+        return res.status(400).json({ message: "User has no developer application" });
+      }
+
+      updateOne<User>("users.json", (u) => u.id === userId, {
+        role: "developer",
+        developerProfile: {
+          ...targetUser.developerProfile,
+          status: "approved",
+        },
+      });
+
+      res.json({ success: true, message: "Developer approved" });
+    } catch (error) {
+      console.error("Approve developer error:", error);
+      res.status(500).json({ message: "Failed to approve developer" });
+    }
+  });
+
+  // Admin: Reject developer
+  app.post("/api/admin/developer/reject", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const { userId } = req.body;
+
+      const adminUser = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!adminUser || adminUser.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+
+      const targetUser = findOne<User>("users.json", (u) => u.id === userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (!targetUser.developerProfile) {
+        return res.status(400).json({ message: "User has no developer application" });
+      }
+
+      updateOne<User>("users.json", (u) => u.id === userId, {
+        developerProfile: {
+          ...targetUser.developerProfile,
+          status: "rejected",
+        },
+      });
+
+      res.json({ success: true, message: "Developer rejected" });
+    } catch (error) {
+      console.error("Reject developer error:", error);
+      res.status(500).json({ message: "Failed to reject developer" });
+    }
+  });
+
+  // ========================================
+  // DEVELOPER GAME ROUTES
+  // ========================================
+
+  // Create a new game
+  app.post("/api/developer/game/create", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const { title, description, price, genre, tags, coverImage } = req.body;
+
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (user.role !== "developer" || user.developerProfile?.status !== "approved") {
+        return res.status(403).json({ message: "Only approved developers can create games" });
+      }
+
+      if (!title || !description || typeof price !== "number" || !genre) {
+        return res.status(400).json({ message: "Title, description, price, and genre are required" });
+      }
+
+      const game: DeveloperGame = {
+        gameId: uuidv4(),
+        developerId: user.id,
+        title,
+        description,
+        price,
+        genre,
+        tags: tags || [],
+        status: "draft",
+        versions: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        coverImage: coverImage || "",
+      };
+
+      insertOne("developerGames.json", game);
+
+      res.json({ success: true, game });
+    } catch (error) {
+      console.error("Create game error:", error);
+      res.status(500).json({ message: "Failed to create game" });
+    }
+  });
+
+  // Update a game
+  app.post("/api/developer/game/update", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const { gameId, title, description, price, genre, tags, coverImage } = req.body;
+
+      if (!gameId) {
+        return res.status(400).json({ message: "Game ID is required" });
+      }
+
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const game = findOne<DeveloperGame>("developerGames.json", (g) => g.gameId === gameId);
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      if (game.developerId !== user.id) {
+        return res.status(403).json({ message: "You can only edit your own games" });
+      }
+
+      const updates: Partial<DeveloperGame> = {
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (title) updates.title = title;
+      if (description) updates.description = description;
+      if (typeof price === "number") updates.price = price;
+      if (genre) updates.genre = genre;
+      if (tags) updates.tags = tags;
+      if (coverImage !== undefined) updates.coverImage = coverImage;
+
+      const updatedGame = updateOne<DeveloperGame>("developerGames.json", (g) => g.gameId === gameId, updates);
+
+      res.json({ success: true, game: updatedGame });
+    } catch (error) {
+      console.error("Update game error:", error);
+      res.status(500).json({ message: "Failed to update game" });
+    }
+  });
+
+  // Submit game for review
+  app.post("/api/developer/game/submitForReview", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const { gameId } = req.body;
+
+      if (!gameId) {
+        return res.status(400).json({ message: "Game ID is required" });
+      }
+
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const game = findOne<DeveloperGame>("developerGames.json", (g) => g.gameId === gameId);
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      if (game.developerId !== user.id) {
+        return res.status(403).json({ message: "You can only submit your own games" });
+      }
+
+      if (game.status !== "draft" && game.status !== "rejected") {
+        return res.status(400).json({ message: "Only draft or rejected games can be submitted for review" });
+      }
+
+      updateOne<DeveloperGame>("developerGames.json", (g) => g.gameId === gameId, {
+        status: "pending",
+        updatedAt: new Date().toISOString(),
+      });
+
+      res.json({ success: true, message: "Game submitted for review" });
+    } catch (error) {
+      console.error("Submit for review error:", error);
+      res.status(500).json({ message: "Failed to submit for review" });
+    }
+  });
+
+  // Get developer's games
+  app.get("/api/developer/games", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (user.role !== "developer" || user.developerProfile?.status !== "approved") {
+        return res.status(403).json({ message: "Only approved developers can view their games" });
+      }
+
+      const games = findMany<DeveloperGame>("developerGames.json", (g) => g.developerId === user.id);
+
+      res.json(games);
+    } catch (error) {
+      console.error("Get developer games error:", error);
+      res.status(500).json({ message: "Failed to get games" });
+    }
+  });
+
+  // Get single game for editing
+  app.get("/api/developer/game/:gameId", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const { gameId } = req.params;
+
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const game = findOne<DeveloperGame>("developerGames.json", (g) => g.gameId === gameId);
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      if (game.developerId !== user.id) {
+        return res.status(403).json({ message: "You can only view your own games" });
+      }
+
+      res.json(game);
+    } catch (error) {
+      console.error("Get game error:", error);
+      res.status(500).json({ message: "Failed to get game" });
+    }
+  });
+
+  // Admin: Get all pending games
+  app.get("/api/admin/games/pending", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const adminUser = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!adminUser || adminUser.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const pendingGames = findMany<DeveloperGame>("developerGames.json", (g) => g.status === "pending");
+
+      const gamesWithDeveloper = pendingGames.map(game => {
+        const developer = findOne<User>("users.json", (u) => u.id === game.developerId);
+        return {
+          ...game,
+          developerName: developer?.developerProfile?.studioName || developer?.username || "Unknown",
+        };
+      });
+
+      res.json(gamesWithDeveloper);
+    } catch (error) {
+      console.error("Get pending games error:", error);
+      res.status(500).json({ message: "Failed to get pending games" });
+    }
+  });
+
+  // Admin: Approve game
+  app.post("/api/admin/game/approve", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const { gameId } = req.body;
+
+      const adminUser = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!adminUser || adminUser.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      if (!gameId) {
+        return res.status(400).json({ message: "Game ID is required" });
+      }
+
+      const game = findOne<DeveloperGame>("developerGames.json", (g) => g.gameId === gameId);
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      updateOne<DeveloperGame>("developerGames.json", (g) => g.gameId === gameId, {
+        status: "approved",
+        updatedAt: new Date().toISOString(),
+      });
+
+      // Award developer achievement if this is their first approved game
+      const developer = findOne<User>("users.json", (u) => u.id === game.developerId);
+      if (developer) {
+        const existingAchievement = findOne<UserAchievement>("achievements.json", 
+          (a) => a.userId === developer.id && a.achievementId === "developer"
+        );
+        if (!existingAchievement) {
+          insertOne<UserAchievement>("achievements.json", {
+            id: uuidv4(),
+            userId: developer.id,
+            achievementId: "developer",
+            unlockedAt: new Date().toISOString(),
+          });
+        }
+      }
+
+      res.json({ success: true, message: "Game approved" });
+    } catch (error) {
+      console.error("Approve game error:", error);
+      res.status(500).json({ message: "Failed to approve game" });
+    }
+  });
+
+  // Admin: Reject game
+  app.post("/api/admin/game/reject", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const { gameId, reason } = req.body;
+
+      const adminUser = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!adminUser || adminUser.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      if (!gameId) {
+        return res.status(400).json({ message: "Game ID is required" });
+      }
+
+      const game = findOne<DeveloperGame>("developerGames.json", (g) => g.gameId === gameId);
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      updateOne<DeveloperGame>("developerGames.json", (g) => g.gameId === gameId, {
+        status: "rejected",
+        updatedAt: new Date().toISOString(),
+      });
+
+      res.json({ success: true, message: "Game rejected" });
+    } catch (error) {
+      console.error("Reject game error:", error);
+      res.status(500).json({ message: "Failed to reject game" });
+    }
+  });
+
+  // Get approved developer games for store
+  app.get("/api/store/developer-games", (req, res) => {
+    try {
+      const approvedGames = findMany<DeveloperGame>("developerGames.json", (g) => g.status === "approved");
+
+      const gamesWithDeveloper = approvedGames.map(game => {
+        const developer = findOne<User>("users.json", (u) => u.id === game.developerId);
+        return {
+          ...game,
+          developerName: developer?.developerProfile?.studioName || developer?.username || "Unknown",
+        };
+      });
+
+      res.json(gamesWithDeveloper);
+    } catch (error) {
+      console.error("Get store developer games error:", error);
+      res.status(500).json({ message: "Failed to get developer games" });
+    }
+  });
+
+  // Admin: Set user as admin (for initial setup)
+  app.post("/api/admin/make-admin", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const { secretKey, targetUserId } = req.body;
+
+      // Simple secret key check for initial admin setup
+      if (secretKey !== "nexaros-admin-setup-2024") {
+        return res.status(403).json({ message: "Invalid secret key" });
+      }
+
+      const userId = targetUserId || req.user!.userId;
+      const user = findOne<User>("users.json", (u) => u.id === userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      updateOne<User>("users.json", (u) => u.id === userId, {
+        role: "admin",
+      });
+
+      res.json({ success: true, message: "User is now an admin" });
+    } catch (error) {
+      console.error("Make admin error:", error);
+      res.status(500).json({ message: "Failed to make admin" });
     }
   });
 
