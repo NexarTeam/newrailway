@@ -86,7 +86,7 @@ export default function NexarSidebar({ currentPage, onNavigate, downloadCount, p
                 )}
                 {item.id === "wallet" && walletBalance !== undefined && (
                   <span className="ml-auto text-xs text-muted-foreground" data-testid="wallet-balance-sidebar">
-                    ${walletBalance.toFixed(2)}
+                    £{walletBalance.toFixed(2)}
                   </span>
                 )}
               </Button>
