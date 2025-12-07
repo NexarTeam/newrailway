@@ -12,6 +12,7 @@ interface NexarSidebarProps {
   onNavigate: (page: NavPage) => void;
   downloadCount?: number;
   pendingFriendRequests?: number;
+  walletBalance?: number;
   user?: { username: string; avatarUrl?: string } | null;
   onLogout?: () => void;
 }
@@ -38,7 +39,7 @@ const settingsItems: { id: NavPage; label: string; icon: typeof Home }[] = [
   { id: "developer", label: "Developer", icon: Code },
 ];
 
-export default function NexarSidebar({ currentPage, onNavigate, downloadCount, pendingFriendRequests, user, onLogout }: NexarSidebarProps) {
+export default function NexarSidebar({ currentPage, onNavigate, downloadCount, pendingFriendRequests, walletBalance, user, onLogout }: NexarSidebarProps) {
   const getInitials = (name: string) => name.slice(0, 2).toUpperCase();
 
   return (
@@ -81,6 +82,11 @@ export default function NexarSidebar({ currentPage, onNavigate, downloadCount, p
                 {item.id === "downloads" && downloadCount && downloadCount > 0 && (
                   <span className="ml-auto bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
                     {downloadCount}
+                  </span>
+                )}
+                {item.id === "wallet" && walletBalance !== undefined && (
+                  <span className="ml-auto text-xs text-muted-foreground" data-testid="wallet-balance-sidebar">
+                    ${walletBalance.toFixed(2)}
                   </span>
                 )}
               </Button>

@@ -104,6 +104,7 @@ function NexarOS() {
   const [currentPage, setCurrentPage] = useState<NavPage>("home");
   const [libraryGames, setLibraryGames] = useState<Game[]>(mockLibraryGames);
   const [pendingFriendRequests, setPendingFriendRequests] = useState<number>(0);
+  const [walletBalance, setWalletBalance] = useState<number | undefined>(undefined);
   const [downloads, setDownloads] = useState<DownloadInfo[]>([
     { 
       id: "dl-1", 
@@ -176,6 +177,28 @@ function NexarOS() {
 
     fetchPendingRequests();
     const interval = setInterval(fetchPendingRequests, 30000);
+    return () => clearInterval(interval);
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    
+    const fetchWalletBalance = async () => {
+      try {
+        const response = await fetch("/api/wallet", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setWalletBalance(data.balance);
+        }
+      } catch (error) {
+        console.error("Failed to fetch wallet balance:", error);
+      }
+    };
+
+    fetchWalletBalance();
+    const interval = setInterval(fetchWalletBalance, 60000);
     return () => clearInterval(interval);
   }, [token]);
 
@@ -421,6 +444,7 @@ function NexarOS() {
         onNavigate={handleNavigate}
         downloadCount={activeDownloadCount}
         pendingFriendRequests={pendingFriendRequests}
+        walletBalance={walletBalance}
         user={user ? { username: user.username, avatarUrl: user.avatarUrl } : null}
         onLogout={logout}
       />
