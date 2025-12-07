@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Monitor, Wifi, HardDrive, Info, Palette, Zap, Shield, Bell, Cpu, MonitorSmartphone, Server, Clock, ShoppingCart, Lock, AlertTriangle } from "lucide-react";
+import { Monitor, Wifi, HardDrive, Info, Palette, Zap, Shield, Bell, Cpu, MonitorSmartphone, Server, Clock, ShoppingCart, Lock, AlertTriangle, Crown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -61,8 +61,25 @@ const CONTENT_RATINGS = [
   { value: "18+", label: "Adults Only (18+)" },
 ];
 
+interface ThemeOption {
+  id: string;
+  name: string;
+  colors: { primary: string; accent: string; bg: string };
+  isPremium: boolean;
+}
+
+const THEME_OPTIONS: ThemeOption[] = [
+  { id: "nexar-red", name: "Nexar Red", colors: { primary: "#d00024", accent: "#ff1a40", bg: "#0a0a0a" }, isPremium: false },
+  { id: "midnight-blue", name: "Midnight Blue", colors: { primary: "#1e3a5f", accent: "#2e5a8f", bg: "#0a0a0a" }, isPremium: false },
+  { id: "neon-green", name: "Neon Green", colors: { primary: "#00ff88", accent: "#00cc6a", bg: "#0a0a0a" }, isPremium: true },
+  { id: "royal-purple", name: "Royal Purple", colors: { primary: "#8b5cf6", accent: "#a78bfa", bg: "#0a0a0a" }, isPremium: true },
+  { id: "sunset-orange", name: "Sunset Orange", colors: { primary: "#f97316", accent: "#fb923c", bg: "#0a0a0a" }, isPremium: true },
+  { id: "cyber-pink", name: "Cyber Pink", colors: { primary: "#ec4899", accent: "#f472b6", bg: "#0a0a0a" }, isPremium: true },
+];
+
 export default function SettingsPanel() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("display");
+  const [selectedTheme, setSelectedTheme] = useState("nexar-red");
   const { toast } = useToast();
   
   const { data: systemInfo, isLoading: systemLoading } = useQuery<SystemInfo>({
@@ -72,6 +89,12 @@ export default function SettingsPanel() {
   const { data: parentalStatus, isLoading: parentalLoading, refetch: refetchParental } = useQuery<ParentalStatus>({
     queryKey: ["/api/parental/status"],
   });
+
+  const { data: subscriptionStatus } = useQuery<{ hasActiveSubscription: boolean }>({
+    queryKey: ["/api/subscription/status"],
+  });
+
+  const hasNexarPlus = subscriptionStatus?.hasActiveSubscription ?? false;
 
   const [settings, setSettings] = useState({
     darkMode: true,
@@ -291,6 +314,83 @@ export default function SettingsPanel() {
                       {settings.brightness[0]}%
                     </span>
                   </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Palette className="w-5 h-5 text-primary" />
+                    Color Theme
+                  </CardTitle>
+                  <CardDescription>Choose your accent color theme</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-3">
+                    {THEME_OPTIONS.map((theme) => {
+                      const isLocked = theme.isPremium && !hasNexarPlus;
+                      const isSelected = selectedTheme === theme.id;
+                      
+                      return (
+                        <button
+                          key={theme.id}
+                          onClick={() => {
+                            if (isLocked) {
+                              toast({
+                                title: "Nexar+ Required",
+                                description: "Subscribe to Nexar+ to unlock premium themes",
+                              });
+                              return;
+                            }
+                            setSelectedTheme(theme.id);
+                            toast({
+                              title: "Theme Applied",
+                              description: `${theme.name} theme is now active`,
+                            });
+                          }}
+                          disabled={isLocked}
+                          className={`relative flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                            isSelected
+                              ? "border-primary bg-primary/10"
+                              : isLocked
+                              ? "border-border/50 opacity-60 cursor-not-allowed"
+                              : "border-border hover:border-primary/50"
+                          }`}
+                          data-testid={`theme-${theme.id}`}
+                        >
+                          <div
+                            className="w-8 h-8 rounded-full border-2"
+                            style={{
+                              backgroundColor: theme.colors.primary,
+                              borderColor: theme.colors.accent,
+                            }}
+                          />
+                          <div className="flex-1 text-left">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-foreground text-sm">{theme.name}</span>
+                              {theme.isPremium && (
+                                <Crown className="w-3 h-3 text-yellow-500" />
+                              )}
+                            </div>
+                            {isLocked && (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Lock className="w-3 h-3" />
+                                Nexar+ Required
+                              </span>
+                            )}
+                          </div>
+                          {isSelected && (
+                            <Check className="w-4 h-4 text-primary" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {!hasNexarPlus && (
+                    <p className="text-xs text-muted-foreground mt-4 text-center">
+                      Unlock 4 premium themes with Nexar+ subscription
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </>

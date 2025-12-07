@@ -8,8 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, User, Calendar, Upload, Camera } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Loader2, Save, User, Calendar, Upload, Camera, Crown } from "lucide-react";
 
 interface Achievement {
   id: string;
@@ -30,6 +32,12 @@ export default function ProfilePage() {
   const [bio, setBio] = useState(user?.bio || "");
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: subscriptionStatus } = useQuery<{ hasActiveSubscription: boolean }>({
+    queryKey: ["/api/subscription/status"],
+  });
+
+  const hasNexarPlus = subscriptionStatus?.hasActiveSubscription ?? false;
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -167,12 +175,23 @@ export default function ProfilePage() {
             </div>
 
             <div className="flex-1">
-              <h2
-                className="text-2xl font-bold text-[#EAEAEA]"
-                data-testid="text-username"
-              >
-                {user.username}
-              </h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2
+                  className="text-2xl font-bold text-[#EAEAEA]"
+                  data-testid="text-username"
+                >
+                  {user.username}
+                </h2>
+                {hasNexarPlus && (
+                  <Badge 
+                    className="bg-gradient-to-r from-yellow-500 to-amber-600 text-black border-0"
+                    data-testid="badge-nexar-plus"
+                  >
+                    <Crown className="w-3 h-3 mr-1" />
+                    Nexar+ Member
+                  </Badge>
+                )}
+              </div>
               <p className="text-[#A3A3A3] text-sm" data-testid="text-email">
                 {user.email}
               </p>
