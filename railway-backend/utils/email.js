@@ -26,7 +26,7 @@ async function sendVerificationEmail(toEmail, username, verificationToken) {
     
     const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
     
-    const verificationLink = `${baseUrl}/verify?token=${verificationToken}`;
+    const verificationLink = `${baseUrl}/api/auth/verify?token=${verificationToken}`;
     console.log('[Email] Verification link:', verificationLink);
     
     console.log('[Email] Sending email via Resend...');
@@ -75,7 +75,7 @@ async function sendPasswordResetEmail(toEmail, username, resetToken) {
     
     const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
     
-    const resetLink = `${baseUrl}/reset-password?token=${resetToken}`;
+    const resetLink = `${baseUrl}/api/auth/reset-password?token=${resetToken}`;
     
     console.log('[Email] Sending password reset email...');
     const result = await client.emails.send({
