@@ -93,6 +93,20 @@ interface ParentalControls {
   };
 }
 
+interface Subscription {
+  active: boolean;
+  renewalDate: string;
+  stripeCustomerId: string;
+  stripeSubscriptionId: string;
+}
+
+interface TrialUsage {
+  [gameId: string]: {
+    minutesPlayed: number;
+    expired: boolean;
+  };
+}
+
 interface User {
   id: string;
   email: string;
@@ -108,6 +122,8 @@ interface User {
   passwordResetToken?: string;
   passwordResetTokenExpiry?: number;
   parentalControls?: ParentalControls;
+  subscription?: Subscription;
+  trialUsage?: TrialUsage;
 }
 
 interface WalletTransaction {
@@ -162,16 +178,28 @@ const ACHIEVEMENTS_LIST = [
   { id: "developer", name: "Developer", description: "Have a game approved for the Nexar Store", icon: "code" },
 ];
 
-const GAME_CATALOG: Record<string, { price: number; name: string }> = {
-  "store-1": { price: 49.99, name: "Cyber Legends" },
-  "store-2": { price: 59.99, name: "Dragon's Quest" },
-  "store-3": { price: 29.99, name: "Speed Racer" },
-  "store-4": { price: 39.99, name: "Mystery Manor" },
-  "store-5": { price: 69.99, name: "Galactic Wars" },
-  "store-6": { price: 24.99, name: "Puzzle Master" },
-  "store-7": { price: 34.99, name: "Sports Champions" },
-  "store-8": { price: 44.99, name: "Adventure Time" },
+interface GameCatalogEntry {
+  price: number;
+  name: string;
+  trialEnabled?: boolean;
+  trialDurationMinutes?: number;
+  nexarPlusDiscount?: number;
+  inNexarPlusCollection?: boolean;
+}
+
+const GAME_CATALOG: Record<string, GameCatalogEntry> = {
+  "store-1": { price: 49.99, name: "Galactic Frontier", trialEnabled: true, trialDurationMinutes: 120, nexarPlusDiscount: 20 },
+  "store-2": { price: 59.99, name: "Dragon's Legacy", trialEnabled: true, trialDurationMinutes: 120, nexarPlusDiscount: 15 },
+  "store-3": { price: 29.99, name: "Urban Legends", nexarPlusDiscount: 25 },
+  "store-4": { price: 39.99, name: "Quantum Break", trialEnabled: true, trialDurationMinutes: 120 },
+  "store-5": { price: 69.99, name: "Warzone Elite", nexarPlusDiscount: 10 },
+  "store-6": { price: 24.99, name: "Speed Kings" },
+  "store-7": { price: 34.99, name: "Empire Builder", inNexarPlusCollection: true },
+  "store-8": { price: 44.99, name: "Championship 2025", inNexarPlusCollection: true },
 };
+
+const NEXAR_PLUS_PRICE = 4.99;
+const NEXAR_PLUS_CURRENCY = "gbp";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -1486,6 +1514,339 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Check purchase error:", error);
       res.status(500).json({ message: "Failed to check purchase permission" });
+    }
+  });
+
+  // ==================== NEXAR+ SUBSCRIPTION ROUTES ====================
+
+  // Get subscription status
+  app.get("/api/subscription/status", authMiddleware, (req: AuthenticatedRequest, res) => {
+    const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({
+      active: user.subscription?.active || false,
+      renewalDate: user.subscription?.renewalDate || "",
+      stripeSubscriptionId: user.subscription?.stripeSubscriptionId || "",
+    });
+  });
+
+  // Create Stripe subscription checkout session
+  app.post("/api/subscription/create-checkout", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (user.subscription?.active) {
+        return res.status(400).json({ message: "Already subscribed to Nexar+" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      
+      const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] 
+        ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+        : 'http://localhost:5000';
+
+      // Create or get Stripe customer
+      let customerId = user.subscription?.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          metadata: { userId: user.id },
+        });
+        customerId = customer.id;
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        payment_method_types: ['card'],
+        line_items: [{
+          price_data: {
+            currency: NEXAR_PLUS_CURRENCY,
+            product_data: {
+              name: 'Nexar+ Subscription',
+              description: 'Monthly subscription: Game trials, discounts, exclusive content & free games',
+            },
+            unit_amount: Math.round(NEXAR_PLUS_PRICE * 100),
+            recurring: {
+              interval: 'month',
+            },
+          },
+          quantity: 1,
+        }],
+        mode: 'subscription',
+        success_url: `${baseUrl}/nexar-plus?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/nexar-plus?canceled=true`,
+        metadata: {
+          userId: user.id,
+          type: 'nexar_plus_subscription',
+        },
+      });
+
+      res.json({ url: session.url, sessionId: session.id });
+    } catch (error) {
+      console.error("Subscription checkout error:", error);
+      res.status(500).json({ message: "Failed to create subscription checkout" });
+    }
+  });
+
+  // Verify subscription after checkout
+  app.post("/api/subscription/verify", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { sessionId } = req.body;
+      
+      if (!sessionId) {
+        return res.status(400).json({ message: "Session ID is required" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(sessionId, {
+        expand: ['subscription'],
+      });
+
+      if (session.metadata?.userId !== req.user!.userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      if (session.payment_status !== 'paid') {
+        return res.status(400).json({ message: "Payment not completed" });
+      }
+
+      const subscription = session.subscription as any;
+      if (!subscription) {
+        return res.status(400).json({ message: "Subscription not found" });
+      }
+
+      const renewalDate = new Date(subscription.current_period_end * 1000).toISOString();
+
+      updateOne<User>("users.json", (u) => u.id === req.user!.userId, {
+        subscription: {
+          active: true,
+          renewalDate,
+          stripeCustomerId: session.customer as string,
+          stripeSubscriptionId: subscription.id,
+        },
+      });
+
+      res.json({ 
+        success: true, 
+        subscription: {
+          active: true,
+          renewalDate,
+        }
+      });
+    } catch (error) {
+      console.error("Subscription verify error:", error);
+      res.status(500).json({ message: "Failed to verify subscription" });
+    }
+  });
+
+  // Cancel subscription
+  app.post("/api/subscription/cancel", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (!user.subscription?.active || !user.subscription.stripeSubscriptionId) {
+        return res.status(400).json({ message: "No active subscription to cancel" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      await stripe.subscriptions.cancel(user.subscription.stripeSubscriptionId);
+
+      updateOne<User>("users.json", (u) => u.id === req.user!.userId, {
+        subscription: {
+          ...user.subscription,
+          active: false,
+        },
+      });
+
+      res.json({ success: true, message: "Subscription cancelled successfully" });
+    } catch (error) {
+      console.error("Cancel subscription error:", error);
+      res.status(500).json({ message: "Failed to cancel subscription" });
+    }
+  });
+
+  // ==================== GAME TRIAL ROUTES ====================
+
+  // Get game metadata (for frontend)
+  app.get("/api/games/metadata", (req, res) => {
+    res.json(GAME_CATALOG);
+  });
+
+  // Check trial access
+  app.post("/api/games/trial/check", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const { gameId } = req.body;
+      
+      if (!gameId) {
+        return res.status(400).json({ message: "Game ID is required" });
+      }
+
+      const game = GAME_CATALOG[gameId];
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      if (!game.trialEnabled) {
+        return res.json({ allowed: false, reason: "Trial not available for this game" });
+      }
+
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (!user.subscription?.active) {
+        return res.json({ allowed: false, reason: "Nexar+ subscription required for game trials" });
+      }
+
+      const trialData = user.trialUsage?.[gameId];
+      if (trialData?.expired) {
+        return res.json({ allowed: false, reason: "Trial expired - purchase to continue playing" });
+      }
+
+      const minutesPlayed = trialData?.minutesPlayed || 0;
+      const trialDuration = game.trialDurationMinutes || 120;
+      const minutesRemaining = trialDuration - minutesPlayed;
+
+      res.json({ 
+        allowed: true, 
+        minutesRemaining,
+        minutesPlayed,
+        trialDuration,
+      });
+    } catch (error) {
+      console.error("Trial check error:", error);
+      res.status(500).json({ message: "Failed to check trial status" });
+    }
+  });
+
+  // Update trial usage
+  app.post("/api/games/trial/update", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const { gameId, minutesPlayed } = req.body;
+      
+      if (!gameId || typeof minutesPlayed !== "number") {
+        return res.status(400).json({ message: "Game ID and minutes played are required" });
+      }
+
+      const game = GAME_CATALOG[gameId];
+      if (!game || !game.trialEnabled) {
+        return res.status(400).json({ message: "Trial not available for this game" });
+      }
+
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const currentUsage = user.trialUsage?.[gameId] || { minutesPlayed: 0, expired: false };
+      const newMinutesPlayed = currentUsage.minutesPlayed + minutesPlayed;
+      const trialDuration = game.trialDurationMinutes || 120;
+      const expired = newMinutesPlayed >= trialDuration;
+
+      const updatedTrialUsage = {
+        ...user.trialUsage,
+        [gameId]: {
+          minutesPlayed: newMinutesPlayed,
+          expired,
+        },
+      };
+
+      updateOne<User>("users.json", (u) => u.id === req.user!.userId, {
+        trialUsage: updatedTrialUsage,
+      });
+
+      res.json({ 
+        success: true, 
+        minutesRemaining: Math.max(0, trialDuration - newMinutesPlayed),
+        expired,
+      });
+    } catch (error) {
+      console.error("Trial update error:", error);
+      res.status(500).json({ message: "Failed to update trial usage" });
+    }
+  });
+
+  // Check Nexar+ collection access
+  app.post("/api/games/nexarplus/check", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const { gameId } = req.body;
+      
+      if (!gameId) {
+        return res.status(400).json({ message: "Game ID is required" });
+      }
+
+      const game = GAME_CATALOG[gameId];
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      if (!game.inNexarPlusCollection) {
+        return res.json({ allowed: true, isNexarPlusGame: false });
+      }
+
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (!user.subscription?.active) {
+        return res.json({ 
+          allowed: false, 
+          isNexarPlusGame: true,
+          reason: "Requires Nexar+ subscription" 
+        });
+      }
+
+      res.json({ allowed: true, isNexarPlusGame: true });
+    } catch (error) {
+      console.error("Nexar+ check error:", error);
+      res.status(500).json({ message: "Failed to check access" });
+    }
+  });
+
+  // Get discounted price for a game
+  app.get("/api/games/:gameId/price", authMiddleware, (req: AuthenticatedRequest, res) => {
+    try {
+      const { gameId } = req.params;
+      
+      const game = GAME_CATALOG[gameId];
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const basePrice = game.price;
+      let discountedPrice = basePrice;
+      let discountPercent = 0;
+
+      if (user.subscription?.active && game.nexarPlusDiscount) {
+        discountPercent = game.nexarPlusDiscount;
+        discountedPrice = basePrice * (1 - discountPercent / 100);
+      }
+
+      res.json({
+        basePrice,
+        discountedPrice: Math.round(discountedPrice * 100) / 100,
+        discountPercent,
+        hasNexarPlusDiscount: user.subscription?.active && !!game.nexarPlusDiscount,
+      });
+    } catch (error) {
+      console.error("Get price error:", error);
+      res.status(500).json({ message: "Failed to get price" });
     }
   });
 
