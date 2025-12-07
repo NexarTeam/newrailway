@@ -24,33 +24,34 @@ async function sendVerificationEmail(toEmail, username, verificationToken) {
     const { client, fromEmail } = getResendClient();
     console.log('[Email] Got client, fromEmail:', fromEmail);
     
-    const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+    const verifyUrl = `${process.env.BASE_URL}/verify?token=${verificationToken}`;
+    console.log('[Email] Verification link:', verifyUrl);
     
-    const verificationLink = `${baseUrl}/api/auth/verify?token=${verificationToken}`;
-    console.log('[Email] Verification link:', verificationLink);
+    const html = `
+      <div style="background:#111; padding:40px; color:#fff; font-family:Arial, sans-serif;">
+        <h1 style="color:#ff1744;">Welcome to NexarOS, ${username}!</h1>
+        <p>Thank you for creating your NexarOS account. Please verify your email address to unlock all features.</p>
+        
+        <a href="${verifyUrl}" 
+           style="display:inline-block; padding:12px 20px; background:#ff1744; color:#fff; 
+                  text-decoration:none; border-radius:6px; font-size:16px; margin:20px 0;">
+          Verify Email
+        </a>
+
+        <p>If you didn't create this account, you can safely ignore this email.</p>
+
+        <p style="font-size:13px; color:#bbb;">If the button doesn't work, use this link:<br>
+          <a href="${verifyUrl}" style="color:#4da3ff;">${verifyUrl}</a>
+        </p>
+      </div>
+    `;
     
     console.log('[Email] Sending email via Resend...');
     const result = await client.emails.send({
       from: fromEmail,
       to: toEmail,
       subject: 'Verify your NexarOS account',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #111; color: #fff; padding: 40px; border-radius: 8px;">
-          <h1 style="color: #d00024; margin-bottom: 24px;">Welcome to NexarOS, ${username}!</h1>
-          <p style="font-size: 16px; line-height: 1.6; margin-bottom: 24px;">
-            Thank you for creating your NexarOS account. Please verify your email address to unlock all features.
-          </p>
-          <a href="${verificationLink}" style="display: inline-block; background: #d00024; color: #fff; padding: 12px 32px; border-radius: 6px; text-decoration: none; font-weight: bold;">
-            Verify Email
-          </a>
-          <p style="font-size: 14px; color: #888; margin-top: 32px;">
-            If you didn't create this account, you can safely ignore this email.
-          </p>
-          <p style="font-size: 14px; color: #888;">
-            Or copy this link: ${verificationLink}
-          </p>
-        </div>
-      `
+      html
     });
     
     console.log('[Email] Resend API response:', JSON.stringify(result, null, 2));
