@@ -8,6 +8,14 @@ interface Achievement {
   icon: string;
 }
 
+interface DeveloperProfile {
+  studioName: string;
+  website: string;
+  description: string;
+  contactEmail: string;
+  status: "none" | "pending" | "approved" | "rejected";
+}
+
 interface User {
   id: string;
   email: string;
@@ -15,6 +23,8 @@ interface User {
   avatarUrl: string;
   bio: string;
   createdAt: string;
+  role?: "user" | "developer" | "admin";
+  developerProfile?: DeveloperProfile;
 }
 
 interface RegisterResult {

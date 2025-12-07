@@ -38,6 +38,9 @@ import VerifyEmailPage from "@/pages/VerifyEmailPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import NexarPlusPage from "@/pages/NexarPlusPage";
+import DeveloperApplyPage from "@/pages/DeveloperApplyPage";
+import DeveloperPortalPage from "@/pages/DeveloperPortalPage";
+import GameEditorPage from "@/pages/GameEditorPage";
 
 const mockLibraryGames: Game[] = [
   { id: "lib-1", title: "Cyber Assault 2087", isInstalled: true, playTime: 245, size: "45.2 GB", genre: "Action RPG", rating: 4.5, contentRating: "M" },
@@ -131,11 +134,21 @@ function NexarOS() {
   ]);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [showUpdateChecker, setShowUpdateChecker] = useState(false);
+  const [developerView, setDeveloperView] = useState<"portal" | "editor" | null>(null);
+  const [editingGameId, setEditingGameId] = useState<string | undefined>(undefined);
   const [parentalBlockModal, setParentalBlockModal] = useState(false);
   const [parentalBlockReason, setParentalBlockReason] = useState("");
   const [pendingPlayGame, setPendingPlayGame] = useState<Game | null>(null);
   const [overridePin, setOverridePin] = useState("");
   const [overrideLoading, setOverrideLoading] = useState(false);
+
+  const handleNavigate = useCallback((page: NavPage) => {
+    if (page !== "developer") {
+      setDeveloperView(null);
+      setEditingGameId(undefined);
+    }
+    setCurrentPage(page);
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -373,6 +386,29 @@ function NexarOS() {
         return <WalletPage />;
       case "nexarplus":
         return <NexarPlusPage />;
+      case "developer":
+        if (developerView === "editor") {
+          return (
+            <GameEditorPage 
+              gameId={editingGameId} 
+              onBack={() => {
+                setDeveloperView("portal");
+                setEditingGameId(undefined);
+              }} 
+            />
+          );
+        }
+        if (user?.role === "developer" && user?.developerProfile?.status === "approved") {
+          return (
+            <DeveloperPortalPage 
+              onNavigateToEditor={(gameId) => {
+                setEditingGameId(gameId);
+                setDeveloperView("editor");
+              }}
+            />
+          );
+        }
+        return <DeveloperApplyPage />;
       default:
         return null;
     }
@@ -382,7 +418,7 @@ function NexarOS() {
     <div className="flex h-screen w-full bg-background overflow-hidden" data-testid="nexar-os">
       <NexarSidebar
         currentPage={currentPage}
-        onNavigate={setCurrentPage}
+        onNavigate={handleNavigate}
         downloadCount={activeDownloadCount}
         pendingFriendRequests={pendingFriendRequests}
         user={user ? { username: user.username, avatarUrl: user.avatarUrl } : null}

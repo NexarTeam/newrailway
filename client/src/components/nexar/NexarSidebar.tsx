@@ -1,11 +1,11 @@
 import { motion } from "framer-motion";
-import { Home, Library, ShoppingBag, Download, Settings, Gamepad2, User, Users, MessageCircle, Trophy, Cloud, LogOut, Wallet, Crown } from "lucide-react";
+import { Home, Library, ShoppingBag, Download, Settings, Gamepad2, User, Users, MessageCircle, Trophy, Cloud, LogOut, Wallet, Crown, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import NexarLogo from "./NexarLogo";
 
-export type NavPage = "home" | "library" | "store" | "downloads" | "settings" | "profile" | "friends" | "messages" | "achievements" | "cloud" | "wallet" | "nexarplus";
+export type NavPage = "home" | "library" | "store" | "downloads" | "settings" | "profile" | "friends" | "messages" | "achievements" | "cloud" | "wallet" | "nexarplus" | "developer";
 
 interface NexarSidebarProps {
   currentPage: NavPage;
@@ -31,6 +31,7 @@ const nexarIdItems: { id: NavPage; label: string; icon: typeof Home }[] = [
   { id: "achievements", label: "Achievements", icon: Trophy },
   { id: "cloud", label: "Cloud Saves", icon: Cloud },
   { id: "wallet", label: "Wallet", icon: Wallet },
+  { id: "developer", label: "Developer", icon: Code },
 ];
 
 const settingsItems: { id: NavPage; label: string; icon: typeof Home }[] = [
