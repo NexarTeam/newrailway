@@ -1,20 +1,35 @@
-const jwt = require("jsonwebtoken");
+import { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.SESSION_SECRET || "nexaros-secret-key-2024";
 
-function generateToken(payload) {
+export interface JwtPayload {
+  userId: string;
+  email: string;
+  username: string;
+}
+
+export interface AuthenticatedRequest extends Request {
+  user?: JwtPayload;
+}
+
+export function generateToken(payload: JwtPayload): string {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
 }
 
-function verifyToken(token) {
+export function verifyToken(token: string): JwtPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, JWT_SECRET) as JwtPayload;
   } catch {
     return null;
   }
 }
 
-function authMiddleware(req, res, next) {
+export function authMiddleware(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) {
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -31,9 +46,3 @@ function authMiddleware(req, res, next) {
   req.user = payload;
   next();
 }
-
-module.exports = {
-  generateToken,
-  verifyToken,
-  authMiddleware
-};

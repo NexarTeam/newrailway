@@ -1,6 +1,6 @@
-const { Resend } = require('resend');
+import { Resend } from 'resend';
 
-const FROM_EMAIL = process.env.FROM_EMAIL || 'NexarOS <hello@nexargames.co.uk>';
+const FROM_EMAIL = 'NexarOS <hello@nexargames.co.uk>';
 
 function getResendClient() {
   const apiKey = process.env.RESEND_API_KEY;
@@ -17,14 +17,17 @@ function getResendClient() {
   };
 }
 
-async function sendVerificationEmail(toEmail, username, verificationToken) {
+export async function sendVerificationEmail(toEmail: string, username: string, verificationToken: string): Promise<boolean> {
   console.log('[Email] sendVerificationEmail called for:', toEmail);
   
   try {
     const { client, fromEmail } = getResendClient();
     console.log('[Email] Got client, fromEmail:', fromEmail);
     
-    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+    const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] 
+      ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+      : 'http://localhost:5000';
+    
     const verificationLink = `${baseUrl}/verify?token=${verificationToken}`;
     console.log('[Email] Verification link:', verificationLink);
     
@@ -66,13 +69,16 @@ async function sendVerificationEmail(toEmail, username, verificationToken) {
   }
 }
 
-async function sendPasswordResetEmail(toEmail, username, resetToken) {
+export async function sendPasswordResetEmail(toEmail: string, username: string, resetToken: string): Promise<boolean> {
   console.log('[Email] sendPasswordResetEmail called for:', toEmail);
   
   try {
     const { client, fromEmail } = getResendClient();
     
-    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+    const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] 
+      ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+      : 'http://localhost:5000';
+    
     const resetLink = `${baseUrl}/reset-password?token=${resetToken}`;
     
     console.log('[Email] Sending password reset email...');
@@ -109,8 +115,3 @@ async function sendPasswordResetEmail(toEmail, username, resetToken) {
     return false;
   }
 }
-
-module.exports = {
-  sendVerificationEmail,
-  sendPasswordResetEmail
-};

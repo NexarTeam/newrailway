@@ -1,0 +1,104 @@
+[
+  {
+    "id": "75e217c2-a3c4-4862-86c9-6518b6a8c88f",
+    "userId": "8f873b6d-12eb-48c9-9b46-008983825147",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T12:39:51.495Z"
+  },
+  {
+    "id": "fe9d621b-0c30-4a85-b58f-5c8c821bc249",
+    "userId": "3c402b53-e99b-4e45-b8b6-991e843ac0f0",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T12:44:00.310Z"
+  },
+  {
+    "id": "2e05c348-3d3c-484b-ac28-ab9cc85c0583",
+    "userId": "092544e1-34f0-4578-b222-ea6b9f5b0199",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T13:22:18.144Z"
+  },
+  {
+    "id": "1dec959b-e81f-4ddd-b451-36453fe9c0fb",
+    "userId": "50c392ac-b69e-46f5-aceb-16e1dd1ecace",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T14:58:02.305Z"
+  },
+  {
+    "id": "19906d44-b098-4085-99d6-ffcc4c677b15",
+    "userId": "092544e1-34f0-4578-b222-ea6b9f5b0199",
+    "achievementId": "profile_complete",
+    "unlockedAt": "2025-12-06T15:09:59.561Z"
+  },
+  {
+    "id": "c128d0c6-debc-44e4-9129-1e1c751a7744",
+    "userId": "df9f6fcf-7149-4326-88c7-ccffe1775c32",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T15:29:41.243Z"
+  },
+  {
+    "id": "82260c71-9092-48ac-b7de-a8ac54ee63dd",
+    "userId": "8f650c96-6dfd-4339-b661-196a2d5be893",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T15:45:53.192Z"
+  },
+  {
+    "id": "a3f4c601-962d-4889-a5ee-55a2a3cedff8",
+    "userId": "99344342-649b-4309-be36-af1e0ec06306",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T16:13:18.201Z"
+  },
+  {
+    "id": "88b63af7-2054-460e-b713-b9057d22ef03",
+    "userId": "711b15cf-e5c4-4953-b075-b28fac5ca171",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T16:27:58.471Z"
+  },
+  {
+    "id": "9a9b3b22-4acb-482e-a84a-3840aba91563",
+    "userId": "092544e1-34f0-4578-b222-ea6b9f5b0199",
+    "achievementId": "first_friend",
+    "unlockedAt": "2025-12-06T16:29:12.156Z"
+  },
+  {
+    "id": "a13787c5-c58e-4fdb-aac9-387bb0766fa6",
+    "userId": "711b15cf-e5c4-4953-b075-b28fac5ca171",
+    "achievementId": "first_friend",
+    "unlockedAt": "2025-12-06T16:29:12.157Z"
+  },
+  {
+    "id": "2ee5b62f-9d87-4934-a36b-6e3d1cfb4601",
+    "userId": "2f96c987-eb80-4b39-83e0-ae6ea19b597b",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T18:14:31.892Z"
+  },
+  {
+    "id": "60155fb0-01d4-43bd-8665-3d6042df2b9b",
+    "userId": "9a23d5c3-45ec-4be1-a9bc-54c47a8ca02d",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T18:27:22.882Z"
+  },
+  {
+    "id": "f93cb05c-326a-4062-ab83-4e3fbe5f0dc1",
+    "userId": "1f5ade16-c5f9-4bb7-a7ce-7aef1e78b76e",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T18:40:50.240Z"
+  },
+  {
+    "id": "8e8b184f-265a-4ae4-b48f-be5987a800a6",
+    "userId": "ad4e3732-0f7e-416b-ae17-b35ec42e20c2",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T23:03:46.416Z"
+  },
+  {
+    "id": "5dda51e5-813c-4e2f-bf44-48f01e87e916",
+    "userId": "492a5e56-9652-4066-8afb-1ce8a558ff82",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T23:09:08.217Z"
+  },
+  {
+    "id": "e132bf4f-31ec-4b64-8c04-138d06ba3c55",
+    "userId": "e727a32c-88e2-46b6-b872-e19604ad0605",
+    "achievementId": "first_login",
+    "unlockedAt": "2025-12-06T23:14:32.029Z"
+  }
+]
