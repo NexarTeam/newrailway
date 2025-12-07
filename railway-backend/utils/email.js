@@ -15,7 +15,7 @@ async function sendVerificationEmail(toEmail, username, token) {
     return false;
   }
 
-  const verifyUrl = `${baseUrl}/verify?token=${token}`;
+  const verifyUrl = `${baseUrl}/api/auth/verify?token=${token}`;
   console.log("📨 Sending verification email with URL:", verifyUrl);
 
   const resend = getResendClient();

@@ -1,5 +1,4 @@
 const { createServer } = require("http");
-const { storage } = require("./storage");
 const bcrypt = require("bcryptjs");
 const { v4: uuidv4 } = require("uuid");
 const multer = require("multer");
@@ -9,15 +8,7 @@ const {
   generateToken,
   authMiddleware,
 } = require("./middleware/auth");
-const {
-  readJson,
-  writeJson,
-  findOne,
-  findMany,
-  insertOne,
-  updateOne,
-  deleteOne,
-} = require("./utils/fileDb");
+const { query } = require("./db");
 const { sendVerificationEmail, sendPasswordResetEmail } = require("./utils/email");
 const { getUncachableStripeClient, getStripePublishableKey } = require("./stripeClient");
 
@@ -95,6 +86,112 @@ const GAME_CATALOG = {
 const NEXAR_PLUS_PRICE = 4.99;
 const NEXAR_PLUS_CURRENCY = "gbp";
 
+// Helper function to convert DB row (snake_case) to API response (camelCase)
+function dbUserToApiUser(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    email: row.email,
+    username: row.username,
+    passwordHash: row.password_hash,
+    avatarUrl: row.avatar_url || "",
+    bio: row.bio || "",
+    verified: row.verified,
+    verificationToken: row.verification_token,
+    passwordResetToken: row.password_reset_token,
+    passwordResetTokenExpiry: row.password_reset_token_expiry ? Number(row.password_reset_token_expiry) : null,
+    walletBalance: parseFloat(row.wallet_balance) || 0,
+    ownedGames: row.owned_games || [],
+    role: row.role || "user",
+    isDeveloper: row.is_developer,
+    developerProfile: row.developer_profile,
+    stripeCustomerId: row.stripe_customer_id,
+    nexarPlusSubscriptionId: row.nexar_plus_subscription_id,
+    nexarPlusStatus: row.nexar_plus_status,
+    createdAt: row.created_at,
+    subscription: row.developer_profile?.subscription || null,
+    parentalControls: row.developer_profile?.parentalControls || null,
+    trialUsage: row.developer_profile?.trialUsage || null,
+  };
+}
+
+function dbFriendToApiFriend(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    senderId: row.sender_id,
+    receiverId: row.receiver_id,
+    status: row.status,
+    createdAt: row.created_at,
+  };
+}
+
+function dbMessageToApiMessage(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    fromId: row.from_id,
+    toId: row.to_id,
+    text: row.content,
+    timestamp: row.timestamp,
+  };
+}
+
+function dbAchievementToApiAchievement(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    userId: row.user_id,
+    achievementId: row.achievement_id,
+    unlockedAt: row.unlocked_at,
+  };
+}
+
+function dbCloudSaveToApiCloudSave(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    userId: row.user_id,
+    gameId: row.game_id,
+    filename: row.save_name,
+    data: row.save_data,
+    uploadedAt: row.updated_at || row.created_at,
+  };
+}
+
+function dbTransactionToApiTransaction(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    userId: row.user_id,
+    type: row.type,
+    amount: parseFloat(row.amount),
+    description: row.description,
+    stripeSessionId: row.reference_id,
+    gameId: row.reference_id,
+    timestamp: row.created_at,
+  };
+}
+
+function dbDevGameToApiDevGame(row) {
+  if (!row) return null;
+  return {
+    gameId: row.game_id,
+    developerId: row.developer_id,
+    title: row.title,
+    description: row.description,
+    genre: row.genre,
+    tags: row.tags || [],
+    price: parseFloat(row.price),
+    coverImage: row.cover_image || "",
+    screenshots: row.screenshots || [],
+    version: row.version,
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 async function registerRoutes(httpServer, app) {
   
   // Serve uploaded avatars statically
@@ -146,48 +243,36 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "Password must be at least 6 characters" });
       }
 
-      const existingEmail = findOne("users.json", (u) => u.email === email);
-      if (existingEmail) {
+      const existingEmailResult = await query("SELECT id FROM users WHERE email = $1", [email]);
+      if (existingEmailResult.rows.length > 0) {
         return res.status(400).json({ message: "Email already in use" });
       }
 
-      const existingUsername = findOne("users.json", (u) => u.username === username);
-      if (existingUsername) {
+      const existingUsernameResult = await query("SELECT id FROM users WHERE username = $1", [username]);
+      if (existingUsernameResult.rows.length > 0) {
         return res.status(400).json({ message: "Username already taken" });
       }
 
       const passwordHash = await bcrypt.hash(password, 10);
       const verificationToken = uuidv4();
-      const user = {
-        id: uuidv4(),
-        email,
-        username,
-        passwordHash,
-        avatarUrl: "",
-        bio: "",
-        createdAt: new Date().toISOString(),
-        verified: false,
-        verificationToken,
-        walletBalance: 0,
-        ownedGames: [],
-        role: "user",
-      };
+      const userId = uuidv4();
 
-      insertOne("users.json", user);
+      await query(
+        `INSERT INTO users (id, email, username, password_hash, avatar_url, bio, verified, verification_token, wallet_balance, owned_games, role)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [userId, email, username, passwordHash, "", "", false, verificationToken, 0, [], "user"]
+      );
 
-      insertOne("achievements.json", {
-        id: uuidv4(),
-        userId: user.id,
-        achievementId: "first_login",
-        unlockedAt: new Date().toISOString(),
-      });
+      await query(
+        `INSERT INTO achievements (id, user_id, achievement_id, unlocked_at)
+         VALUES ($1, $2, $3, NOW())`,
+        [uuidv4(), userId, "first_login"]
+      );
 
-      // Send verification email - don't log in user until verified
       sendVerificationEmail(email, username, verificationToken).catch(err => {
         console.error("Failed to send verification email:", err);
       });
 
-      // Don't return token - user must verify email first
       res.status(201).json({ 
         message: "Account created! Please check your email to verify your account before logging in.",
         requiresVerification: true
@@ -206,17 +291,18 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "Email and password are required" });
       }
 
-      const user = findOne("users.json", (u) => u.email === email);
-      if (!user) {
+      const result = await query("SELECT * FROM users WHERE email = $1", [email]);
+      if (result.rows.length === 0) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
+
+      const user = dbUserToApiUser(result.rows[0]);
 
       const validPassword = await bcrypt.compare(password, user.passwordHash);
       if (!validPassword) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
-      // Check if user is verified - use same error message as invalid credentials to prevent enumeration
       if (!user.verified) {
         return res.status(401).json({ 
           message: "Invalid email or password"
@@ -237,7 +323,6 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  // Resend verification email endpoint
   app.post("/api/auth/resend-verification", async (req, res) => {
     try {
       const { email } = req.body;
@@ -246,20 +331,19 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "Email is required" });
       }
 
-      const user = findOne("users.json", (u) => u.email === email);
-      if (!user) {
-        // Don't reveal if email exists or not for security
+      const result = await query("SELECT * FROM users WHERE email = $1", [email]);
+      if (result.rows.length === 0) {
         return res.json({ message: "If an account exists with this email, a verification link has been sent." });
       }
+
+      const user = dbUserToApiUser(result.rows[0]);
 
       if (user.verified) {
-        // Return same generic message to prevent account enumeration
         return res.json({ message: "If an account exists with this email, a verification link has been sent." });
       }
 
-      // Generate a new verification token
       const newToken = uuidv4();
-      updateOne("users.json", (u) => u.id === user.id, { verificationToken: newToken });
+      await query("UPDATE users SET verification_token = $1 WHERE id = $2", [newToken, user.id]);
 
       await sendVerificationEmail(email, user.username, newToken);
       
@@ -270,7 +354,6 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  // Password reset request - always returns success for security
   app.post("/api/auth/requestPasswordReset", async (req, res) => {
     try {
       const { email } = req.body;
@@ -280,35 +363,31 @@ async function registerRoutes(httpServer, app) {
       }
 
       const normalizedEmail = email.toLowerCase().trim();
-      const user = findOne("users.json", (u) => u.email.toLowerCase() === normalizedEmail);
+      const result = await query("SELECT * FROM users WHERE LOWER(email) = $1", [normalizedEmail]);
       
-      // Always return success to prevent email enumeration
-      if (!user || !user.verified) {
+      if (result.rows.length === 0 || !result.rows[0].verified) {
         return res.json({ success: true });
       }
 
-      // Generate secure reset token
+      const user = dbUserToApiUser(result.rows[0]);
+
       const resetToken = uuidv4();
-      const resetTokenExpiry = Date.now() + 15 * 60 * 1000; // 15 minutes
+      const resetTokenExpiry = Date.now() + 15 * 60 * 1000;
 
-      // Update user with reset token
-      updateOne("users.json", (u) => u.id === user.id, {
-        passwordResetToken: resetToken,
-        passwordResetTokenExpiry: resetTokenExpiry,
-      });
+      await query(
+        "UPDATE users SET password_reset_token = $1, password_reset_token_expiry = $2 WHERE id = $3",
+        [resetToken, resetTokenExpiry, user.id]
+      );
 
-      // Send password reset email
       await sendPasswordResetEmail(user.email, user.username, resetToken);
 
       res.json({ success: true });
     } catch (error) {
       console.error("Password reset request error:", error);
-      // Still return success to prevent enumeration
       res.json({ success: true });
     }
   });
 
-  // Reset password with token
   app.post("/api/auth/resetPassword", async (req, res) => {
     try {
       const { token, newPassword } = req.body;
@@ -321,32 +400,28 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "Password must be at least 6 characters" });
       }
 
-      // Find user with this reset token
-      const user = findOne("users.json", (u) => u.passwordResetToken === token);
+      const result = await query("SELECT * FROM users WHERE password_reset_token = $1", [token]);
       
-      if (!user) {
+      if (result.rows.length === 0) {
         return res.status(400).json({ message: "Invalid or expired reset token" });
       }
 
-      // Check if token is expired
+      const user = dbUserToApiUser(result.rows[0]);
+
       if (!user.passwordResetTokenExpiry || Date.now() > user.passwordResetTokenExpiry) {
-        // Clear the expired token
-        updateOne("users.json", (u) => u.id === user.id, {
-          passwordResetToken: "",
-          passwordResetTokenExpiry: 0,
-        });
+        await query(
+          "UPDATE users SET password_reset_token = NULL, password_reset_token_expiry = NULL WHERE id = $1",
+          [user.id]
+        );
         return res.status(400).json({ message: "Invalid or expired reset token" });
       }
 
-      // Hash the new password
       const passwordHash = await bcrypt.hash(newPassword, 10);
 
-      // Update password and clear reset token
-      updateOne("users.json", (u) => u.id === user.id, {
-        passwordHash,
-        passwordResetToken: "",
-        passwordResetTokenExpiry: 0,
-      });
+      await query(
+        "UPDATE users SET password_hash = $1, password_reset_token = NULL, password_reset_token_expiry = NULL WHERE id = $2",
+        [passwordHash, user.id]
+      );
 
       res.json({ success: true });
     } catch (error) {
@@ -355,47 +430,78 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  app.get("/api/auth/me", authMiddleware, (req, res) => {
-    const user = findOne("users.json", (u) => u.id === req.user.userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+  app.get("/api/auth/me", authMiddleware, async (req, res) => {
+    try {
+      const result = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      const user = dbUserToApiUser(result.rows[0]);
+      const { passwordHash: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Get me error:", error);
+      res.status(500).json({ message: "Failed to get user" });
     }
-    const { passwordHash: _, ...userWithoutPassword } = user;
-    res.json(userWithoutPassword);
   });
 
   app.patch("/api/auth/profile", authMiddleware, async (req, res) => {
     try {
       const { avatarUrl, bio, username } = req.body;
-      const updates = {};
+      const updates = [];
+      const values = [];
+      let paramIndex = 1;
 
-      if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
-      if (bio !== undefined) updates.bio = bio;
+      if (avatarUrl !== undefined) {
+        updates.push(`avatar_url = $${paramIndex++}`);
+        values.push(avatarUrl);
+      }
+      if (bio !== undefined) {
+        updates.push(`bio = $${paramIndex++}`);
+        values.push(bio);
+      }
       if (username !== undefined) {
-        const existing = findOne("users.json", (u) => u.username === username && u.id !== req.user.userId);
-        if (existing) {
+        const existingResult = await query(
+          "SELECT id FROM users WHERE username = $1 AND id != $2",
+          [username, req.user.userId]
+        );
+        if (existingResult.rows.length > 0) {
           return res.status(400).json({ message: "Username already taken" });
         }
-        updates.username = username;
+        updates.push(`username = $${paramIndex++}`);
+        values.push(username);
       }
 
-      const updated = updateOne("users.json", (u) => u.id === req.user.userId, updates);
-      if (!updated) {
+      if (updates.length === 0) {
+        const result = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+        const user = dbUserToApiUser(result.rows[0]);
+        const { passwordHash: _, ...userWithoutPassword } = user;
+        return res.json({ ...userWithoutPassword, unlockedAchievements: [] });
+      }
+
+      values.push(req.user.userId);
+      const updateResult = await query(
+        `UPDATE users SET ${updates.join(", ")} WHERE id = $${paramIndex} RETURNING *`,
+        values
+      );
+
+      if (updateResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
 
+      const updated = dbUserToApiUser(updateResult.rows[0]);
+
       const unlockedAchievements = [];
       if (updated.avatarUrl && updated.bio) {
-        const existing = findOne("achievements.json", 
-          (a) => a.userId === req.user.userId && a.achievementId === "profile_complete"
+        const existingAchResult = await query(
+          "SELECT id FROM achievements WHERE user_id = $1 AND achievement_id = $2",
+          [req.user.userId, "profile_complete"]
         );
-        if (!existing) {
-          insertOne("achievements.json", {
-            id: uuidv4(),
-            userId: req.user.userId,
-            achievementId: "profile_complete",
-            unlockedAt: new Date().toISOString(),
-          });
+        if (existingAchResult.rows.length === 0) {
+          await query(
+            "INSERT INTO achievements (id, user_id, achievement_id, unlocked_at) VALUES ($1, $2, $3, NOW())",
+            [uuidv4(), req.user.userId, "profile_complete"]
+          );
           const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "profile_complete");
           if (achievement) unlockedAchievements.push(achievement);
         }
@@ -417,23 +523,28 @@ async function registerRoutes(httpServer, app) {
 
       const avatarUrl = `/uploads/avatars/${req.file.filename}`;
       
-      const updated = updateOne("users.json", (u) => u.id === req.user.userId, { avatarUrl });
-      if (!updated) {
+      const updateResult = await query(
+        "UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING *",
+        [avatarUrl, req.user.userId]
+      );
+
+      if (updateResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
 
+      const updated = dbUserToApiUser(updateResult.rows[0]);
+
       const unlockedAchievements = [];
       if (updated.avatarUrl && updated.bio) {
-        const existing = findOne("achievements.json", 
-          (a) => a.userId === req.user.userId && a.achievementId === "profile_complete"
+        const existingAchResult = await query(
+          "SELECT id FROM achievements WHERE user_id = $1 AND achievement_id = $2",
+          [req.user.userId, "profile_complete"]
         );
-        if (!existing) {
-          insertOne("achievements.json", {
-            id: uuidv4(),
-            userId: req.user.userId,
-            achievementId: "profile_complete",
-            unlockedAt: new Date().toISOString(),
-          });
+        if (existingAchResult.rows.length === 0) {
+          await query(
+            "INSERT INTO achievements (id, user_id, achievement_id, unlocked_at) VALUES ($1, $2, $3, NOW())",
+            [uuidv4(), req.user.userId, "profile_complete"]
+          );
           const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "profile_complete");
           if (achievement) unlockedAchievements.push(achievement);
         }
@@ -449,284 +560,396 @@ async function registerRoutes(httpServer, app) {
 
   // ==================== FRIENDS ROUTES ====================
 
-  app.get("/api/friends", authMiddleware, (req, res) => {
-    const userId = req.user.userId;
-    const friendRequests = findMany("friends.json", 
-      (fr) => fr.status === "accepted" && (fr.senderId === userId || fr.receiverId === userId)
-    );
-
-    const friendIds = friendRequests.map((fr) => 
-      fr.senderId === userId ? fr.receiverId : fr.senderId
-    );
-
-    const friends = friendIds.map((id) => {
-      const user = findOne("users.json", (u) => u.id === id);
-      if (!user) return null;
-      const { passwordHash: _, ...userWithoutPassword } = user;
-      return userWithoutPassword;
-    }).filter(Boolean);
-
-    res.json(friends);
-  });
-
-  app.get("/api/friends/requests", authMiddleware, (req, res) => {
-    const userId = req.user.userId;
-    const pending = findMany("friends.json",
-      (fr) => fr.receiverId === userId && fr.status === "pending"
-    );
-
-    const requestsWithUsers = pending.map((fr) => {
-      const sender = findOne("users.json", (u) => u.id === fr.senderId);
-      if (!sender) return null;
-      const { passwordHash: _, ...senderWithoutPassword } = sender;
-      return { ...fr, sender: senderWithoutPassword };
-    }).filter(Boolean);
-
-    res.json(requestsWithUsers);
-  });
-
-  app.get("/api/friends/sent", authMiddleware, (req, res) => {
-    const userId = req.user.userId;
-    const sent = findMany("friends.json",
-      (fr) => fr.senderId === userId && fr.status === "pending"
-    );
-
-    const requestsWithUsers = sent.map((fr) => {
-      const receiver = findOne("users.json", (u) => u.id === fr.receiverId);
-      if (!receiver) return null;
-      const { passwordHash: _, ...receiverWithoutPassword } = receiver;
-      return { ...fr, receiver: receiverWithoutPassword };
-    }).filter(Boolean);
-
-    res.json(requestsWithUsers);
-  });
-
-  app.post("/api/friends/request", authMiddleware, (req, res) => {
-    const { username } = req.body;
-    const userId = req.user.userId;
-
-    if (!username) {
-      return res.status(400).json({ message: "Username is required" });
-    }
-
-    const targetUser = findOne("users.json", (u) => u.username === username);
-    if (!targetUser) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    if (targetUser.id === userId) {
-      return res.status(400).json({ message: "Cannot send friend request to yourself" });
-    }
-
-    const existingRequest = findOne("friends.json", (fr) =>
-      (fr.senderId === userId && fr.receiverId === targetUser.id) ||
-      (fr.senderId === targetUser.id && fr.receiverId === userId)
-    );
-
-    if (existingRequest) {
-      if (existingRequest.status === "accepted") {
-        return res.status(400).json({ message: "Already friends" });
-      }
-      return res.status(400).json({ message: "Friend request already exists" });
-    }
-
-    const friendRequest = {
-      id: uuidv4(),
-      senderId: userId,
-      receiverId: targetUser.id,
-      status: "pending",
-      createdAt: new Date().toISOString(),
-    };
-
-    insertOne("friends.json", friendRequest);
-    res.status(201).json({ message: "Friend request sent" });
-  });
-
-  app.post("/api/friends/accept/:requestId", authMiddleware, (req, res) => {
-    const { requestId } = req.params;
-    const userId = req.user.userId;
-
-    const request = findOne("friends.json", (fr) => fr.id === requestId && fr.receiverId === userId);
-    if (!request) {
-      return res.status(404).json({ message: "Friend request not found" });
-    }
-
-    if (request.status !== "pending") {
-      return res.status(400).json({ message: "Request already processed" });
-    }
-
-    updateOne("friends.json", (fr) => fr.id === requestId, { status: "accepted" });
-
-    // Check for first friend achievement
-    const userFriendships = findMany("friends.json", 
-      (fr) => fr.status === "accepted" && (fr.senderId === userId || fr.receiverId === userId)
-    );
-
-    const unlockedAchievements = [];
-    if (userFriendships.length === 1) {
-      const existingAchievement = findOne("achievements.json", 
-        (a) => a.userId === userId && a.achievementId === "first_friend"
+  app.get("/api/friends", authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const friendsResult = await query(
+        `SELECT * FROM friends 
+         WHERE status = 'accepted' AND (sender_id = $1 OR receiver_id = $1)`,
+        [userId]
       );
-      if (!existingAchievement) {
-        insertOne("achievements.json", {
-          id: uuidv4(),
-          userId,
-          achievementId: "first_friend",
-          unlockedAt: new Date().toISOString(),
-        });
-        const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "first_friend");
-        if (achievement) unlockedAchievements.push(achievement);
-      }
-    }
 
-    if (userFriendships.length >= 5) {
-      const existingAchievement = findOne("achievements.json", 
-        (a) => a.userId === userId && a.achievementId === "social_butterfly"
+      const friendIds = friendsResult.rows.map((fr) => 
+        fr.sender_id === userId ? fr.receiver_id : fr.sender_id
       );
-      if (!existingAchievement) {
-        insertOne("achievements.json", {
-          id: uuidv4(),
-          userId,
-          achievementId: "social_butterfly",
-          unlockedAt: new Date().toISOString(),
-        });
-        const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "social_butterfly");
-        if (achievement) unlockedAchievements.push(achievement);
+
+      if (friendIds.length === 0) {
+        return res.json([]);
       }
-    }
 
-    res.json({ message: "Friend request accepted", unlockedAchievements });
+      const usersResult = await query(
+        "SELECT * FROM users WHERE id = ANY($1)",
+        [friendIds]
+      );
+
+      const friends = usersResult.rows.map(row => {
+        const user = dbUserToApiUser(row);
+        const { passwordHash: _, ...userWithoutPassword } = user;
+        return userWithoutPassword;
+      });
+
+      res.json(friends);
+    } catch (error) {
+      console.error("Get friends error:", error);
+      res.status(500).json({ message: "Failed to get friends" });
+    }
   });
 
-  app.post("/api/friends/reject/:requestId", authMiddleware, (req, res) => {
-    const { requestId } = req.params;
-    const userId = req.user.userId;
+  app.get("/api/friends/requests", authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const pendingResult = await query(
+        "SELECT * FROM friends WHERE receiver_id = $1 AND status = 'pending'",
+        [userId]
+      );
 
-    const request = findOne("friends.json", (fr) => fr.id === requestId && fr.receiverId === userId);
-    if (!request) {
-      return res.status(404).json({ message: "Friend request not found" });
+      const senderIds = pendingResult.rows.map(fr => fr.sender_id);
+      if (senderIds.length === 0) {
+        return res.json([]);
+      }
+
+      const usersResult = await query(
+        "SELECT * FROM users WHERE id = ANY($1)",
+        [senderIds]
+      );
+
+      const usersMap = {};
+      usersResult.rows.forEach(row => {
+        const user = dbUserToApiUser(row);
+        const { passwordHash: _, ...userWithoutPassword } = user;
+        usersMap[user.id] = userWithoutPassword;
+      });
+
+      const requestsWithUsers = pendingResult.rows.map(fr => ({
+        ...dbFriendToApiFriend(fr),
+        sender: usersMap[fr.sender_id],
+      })).filter(r => r.sender);
+
+      res.json(requestsWithUsers);
+    } catch (error) {
+      console.error("Get friend requests error:", error);
+      res.status(500).json({ message: "Failed to get friend requests" });
     }
-
-    updateOne("friends.json", (fr) => fr.id === requestId, { status: "rejected" });
-    res.json({ message: "Friend request rejected" });
   });
 
-  app.delete("/api/friends/:friendId", authMiddleware, (req, res) => {
-    const { friendId } = req.params;
-    const userId = req.user.userId;
+  app.get("/api/friends/sent", authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const sentResult = await query(
+        "SELECT * FROM friends WHERE sender_id = $1 AND status = 'pending'",
+        [userId]
+      );
 
-    const deleted = deleteOne("friends.json", (fr) =>
-      fr.status === "accepted" &&
-      ((fr.senderId === userId && fr.receiverId === friendId) ||
-       (fr.senderId === friendId && fr.receiverId === userId))
-    );
+      const receiverIds = sentResult.rows.map(fr => fr.receiver_id);
+      if (receiverIds.length === 0) {
+        return res.json([]);
+      }
 
-    if (!deleted) {
-      return res.status(404).json({ message: "Friendship not found" });
+      const usersResult = await query(
+        "SELECT * FROM users WHERE id = ANY($1)",
+        [receiverIds]
+      );
+
+      const usersMap = {};
+      usersResult.rows.forEach(row => {
+        const user = dbUserToApiUser(row);
+        const { passwordHash: _, ...userWithoutPassword } = user;
+        usersMap[user.id] = userWithoutPassword;
+      });
+
+      const requestsWithUsers = sentResult.rows.map(fr => ({
+        ...dbFriendToApiFriend(fr),
+        receiver: usersMap[fr.receiver_id],
+      })).filter(r => r.receiver);
+
+      res.json(requestsWithUsers);
+    } catch (error) {
+      console.error("Get sent requests error:", error);
+      res.status(500).json({ message: "Failed to get sent requests" });
     }
+  });
 
-    res.json({ message: "Friend removed" });
+  app.post("/api/friends/request", authMiddleware, async (req, res) => {
+    try {
+      const { username } = req.body;
+      const userId = req.user.userId;
+
+      if (!username) {
+        return res.status(400).json({ message: "Username is required" });
+      }
+
+      const targetResult = await query("SELECT * FROM users WHERE username = $1", [username]);
+      if (targetResult.rows.length === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const targetUser = dbUserToApiUser(targetResult.rows[0]);
+
+      if (targetUser.id === userId) {
+        return res.status(400).json({ message: "Cannot send friend request to yourself" });
+      }
+
+      const existingResult = await query(
+        `SELECT * FROM friends 
+         WHERE (sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1)`,
+        [userId, targetUser.id]
+      );
+
+      if (existingResult.rows.length > 0) {
+        const existing = dbFriendToApiFriend(existingResult.rows[0]);
+        if (existing.status === "accepted") {
+          return res.status(400).json({ message: "Already friends" });
+        }
+        return res.status(400).json({ message: "Friend request already exists" });
+      }
+
+      await query(
+        "INSERT INTO friends (id, sender_id, receiver_id, status, created_at) VALUES ($1, $2, $3, $4, NOW())",
+        [uuidv4(), userId, targetUser.id, "pending"]
+      );
+
+      res.status(201).json({ message: "Friend request sent" });
+    } catch (error) {
+      console.error("Send friend request error:", error);
+      res.status(500).json({ message: "Failed to send friend request" });
+    }
+  });
+
+  app.post("/api/friends/accept/:requestId", authMiddleware, async (req, res) => {
+    try {
+      const { requestId } = req.params;
+      const userId = req.user.userId;
+
+      const requestResult = await query(
+        "SELECT * FROM friends WHERE id = $1 AND receiver_id = $2",
+        [requestId, userId]
+      );
+
+      if (requestResult.rows.length === 0) {
+        return res.status(404).json({ message: "Friend request not found" });
+      }
+
+      const request = dbFriendToApiFriend(requestResult.rows[0]);
+
+      if (request.status !== "pending") {
+        return res.status(400).json({ message: "Request already processed" });
+      }
+
+      await query("UPDATE friends SET status = 'accepted' WHERE id = $1", [requestId]);
+
+      const friendshipsResult = await query(
+        `SELECT * FROM friends 
+         WHERE status = 'accepted' AND (sender_id = $1 OR receiver_id = $1)`,
+        [userId]
+      );
+
+      const unlockedAchievements = [];
+      
+      if (friendshipsResult.rows.length === 1) {
+        const existingAchResult = await query(
+          "SELECT id FROM achievements WHERE user_id = $1 AND achievement_id = $2",
+          [userId, "first_friend"]
+        );
+        if (existingAchResult.rows.length === 0) {
+          await query(
+            "INSERT INTO achievements (id, user_id, achievement_id, unlocked_at) VALUES ($1, $2, $3, NOW())",
+            [uuidv4(), userId, "first_friend"]
+          );
+          const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "first_friend");
+          if (achievement) unlockedAchievements.push(achievement);
+        }
+      }
+
+      if (friendshipsResult.rows.length >= 5) {
+        const existingAchResult = await query(
+          "SELECT id FROM achievements WHERE user_id = $1 AND achievement_id = $2",
+          [userId, "social_butterfly"]
+        );
+        if (existingAchResult.rows.length === 0) {
+          await query(
+            "INSERT INTO achievements (id, user_id, achievement_id, unlocked_at) VALUES ($1, $2, $3, NOW())",
+            [uuidv4(), userId, "social_butterfly"]
+          );
+          const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "social_butterfly");
+          if (achievement) unlockedAchievements.push(achievement);
+        }
+      }
+
+      res.json({ message: "Friend request accepted", unlockedAchievements });
+    } catch (error) {
+      console.error("Accept friend request error:", error);
+      res.status(500).json({ message: "Failed to accept friend request" });
+    }
+  });
+
+  app.post("/api/friends/reject/:requestId", authMiddleware, async (req, res) => {
+    try {
+      const { requestId } = req.params;
+      const userId = req.user.userId;
+
+      const requestResult = await query(
+        "SELECT * FROM friends WHERE id = $1 AND receiver_id = $2",
+        [requestId, userId]
+      );
+
+      if (requestResult.rows.length === 0) {
+        return res.status(404).json({ message: "Friend request not found" });
+      }
+
+      await query("UPDATE friends SET status = 'rejected' WHERE id = $1", [requestId]);
+      res.json({ message: "Friend request rejected" });
+    } catch (error) {
+      console.error("Reject friend request error:", error);
+      res.status(500).json({ message: "Failed to reject friend request" });
+    }
+  });
+
+  app.delete("/api/friends/:friendId", authMiddleware, async (req, res) => {
+    try {
+      const { friendId } = req.params;
+      const userId = req.user.userId;
+
+      const deleteResult = await query(
+        `DELETE FROM friends 
+         WHERE status = 'accepted' 
+         AND ((sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1))
+         RETURNING id`,
+        [userId, friendId]
+      );
+
+      if (deleteResult.rows.length === 0) {
+        return res.status(404).json({ message: "Friendship not found" });
+      }
+
+      res.json({ message: "Friend removed" });
+    } catch (error) {
+      console.error("Delete friend error:", error);
+      res.status(500).json({ message: "Failed to remove friend" });
+    }
   });
 
   // ==================== MESSAGES ROUTES ====================
 
-  app.get("/api/messages/:friendId", authMiddleware, (req, res) => {
-    const { friendId } = req.params;
-    const userId = req.user.userId;
+  app.get("/api/messages/:friendId", authMiddleware, async (req, res) => {
+    try {
+      const { friendId } = req.params;
+      const userId = req.user.userId;
 
-    const messages = findMany("messages.json", (m) =>
-      (m.fromId === userId && m.toId === friendId) ||
-      (m.fromId === friendId && m.toId === userId)
-    );
+      const messagesResult = await query(
+        `SELECT * FROM messages 
+         WHERE (from_id = $1 AND to_id = $2) OR (from_id = $2 AND to_id = $1)
+         ORDER BY timestamp ASC`,
+        [userId, friendId]
+      );
 
-    messages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-    res.json(messages);
+      const messages = messagesResult.rows.map(dbMessageToApiMessage);
+      res.json(messages);
+    } catch (error) {
+      console.error("Get messages error:", error);
+      res.status(500).json({ message: "Failed to get messages" });
+    }
   });
 
-  app.post("/api/messages/:friendId", authMiddleware, (req, res) => {
-    const { friendId } = req.params;
-    const { text } = req.body;
-    const userId = req.user.userId;
+  app.post("/api/messages/:friendId", authMiddleware, async (req, res) => {
+    try {
+      const { friendId } = req.params;
+      const { text } = req.body;
+      const userId = req.user.userId;
 
-    if (!text || !text.trim()) {
-      return res.status(400).json({ message: "Message text is required" });
-    }
-
-    const friendship = findOne("friends.json", (fr) =>
-      fr.status === "accepted" &&
-      ((fr.senderId === userId && fr.receiverId === friendId) ||
-       (fr.senderId === friendId && fr.receiverId === userId))
-    );
-
-    if (!friendship) {
-      return res.status(403).json({ message: "You can only message friends" });
-    }
-
-    const message = {
-      id: uuidv4(),
-      fromId: userId,
-      toId: friendId,
-      text: text.trim(),
-      timestamp: new Date().toISOString(),
-    };
-
-    insertOne("messages.json", message);
-
-    // Check for messaging achievements
-    const unlockedAchievements = [];
-    const userMessages = findMany("messages.json", (m) => m.fromId === userId);
-
-    if (userMessages.length === 1) {
-      const existingAchievement = findOne("achievements.json", 
-        (a) => a.userId === userId && a.achievementId === "messenger"
-      );
-      if (!existingAchievement) {
-        insertOne("achievements.json", {
-          id: uuidv4(),
-          userId,
-          achievementId: "messenger",
-          unlockedAt: new Date().toISOString(),
-        });
-        const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "messenger");
-        if (achievement) unlockedAchievements.push(achievement);
+      if (!text || !text.trim()) {
+        return res.status(400).json({ message: "Message text is required" });
       }
-    }
 
-    if (userMessages.length >= 50) {
-      const existingAchievement = findOne("achievements.json", 
-        (a) => a.userId === userId && a.achievementId === "chat_master"
+      const friendshipResult = await query(
+        `SELECT id FROM friends 
+         WHERE status = 'accepted' 
+         AND ((sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1))`,
+        [userId, friendId]
       );
-      if (!existingAchievement) {
-        insertOne("achievements.json", {
-          id: uuidv4(),
-          userId,
-          achievementId: "chat_master",
-          unlockedAt: new Date().toISOString(),
-        });
-        const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "chat_master");
-        if (achievement) unlockedAchievements.push(achievement);
-      }
-    }
 
-    res.status(201).json({ ...message, unlockedAchievements });
+      if (friendshipResult.rows.length === 0) {
+        return res.status(403).json({ message: "You can only message friends" });
+      }
+
+      const messageId = uuidv4();
+      await query(
+        "INSERT INTO messages (id, from_id, to_id, content, timestamp) VALUES ($1, $2, $3, $4, NOW())",
+        [messageId, userId, friendId, text.trim()]
+      );
+
+      const messageResult = await query("SELECT * FROM messages WHERE id = $1", [messageId]);
+      const message = dbMessageToApiMessage(messageResult.rows[0]);
+
+      const unlockedAchievements = [];
+      const userMessagesResult = await query(
+        "SELECT COUNT(*) as count FROM messages WHERE from_id = $1",
+        [userId]
+      );
+      const messageCount = parseInt(userMessagesResult.rows[0].count);
+
+      if (messageCount === 1) {
+        const existingAchResult = await query(
+          "SELECT id FROM achievements WHERE user_id = $1 AND achievement_id = $2",
+          [userId, "messenger"]
+        );
+        if (existingAchResult.rows.length === 0) {
+          await query(
+            "INSERT INTO achievements (id, user_id, achievement_id, unlocked_at) VALUES ($1, $2, $3, NOW())",
+            [uuidv4(), userId, "messenger"]
+          );
+          const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "messenger");
+          if (achievement) unlockedAchievements.push(achievement);
+        }
+      }
+
+      if (messageCount >= 50) {
+        const existingAchResult = await query(
+          "SELECT id FROM achievements WHERE user_id = $1 AND achievement_id = $2",
+          [userId, "chat_master"]
+        );
+        if (existingAchResult.rows.length === 0) {
+          await query(
+            "INSERT INTO achievements (id, user_id, achievement_id, unlocked_at) VALUES ($1, $2, $3, NOW())",
+            [uuidv4(), userId, "chat_master"]
+          );
+          const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "chat_master");
+          if (achievement) unlockedAchievements.push(achievement);
+        }
+      }
+
+      res.status(201).json({ ...message, unlockedAchievements });
+    } catch (error) {
+      console.error("Send message error:", error);
+      res.status(500).json({ message: "Failed to send message" });
+    }
   });
 
   // ==================== ACHIEVEMENTS ROUTES ====================
 
-  app.get("/api/achievements", authMiddleware, (req, res) => {
-    const userId = req.user.userId;
-    const userAchievements = findMany("achievements.json", (a) => a.userId === userId);
+  app.get("/api/achievements", authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const achievementsResult = await query(
+        "SELECT * FROM achievements WHERE user_id = $1",
+        [userId]
+      );
 
-    const achievementsWithDetails = ACHIEVEMENTS_LIST.map(achievement => {
-      const unlocked = userAchievements.find(ua => ua.achievementId === achievement.id);
-      return {
-        ...achievement,
-        unlocked: !!unlocked,
-        unlockedAt: unlocked?.unlockedAt || null,
-      };
-    });
+      const userAchievements = achievementsResult.rows.map(dbAchievementToApiAchievement);
 
-    res.json(achievementsWithDetails);
+      const achievementsWithDetails = ACHIEVEMENTS_LIST.map(achievement => {
+        const unlocked = userAchievements.find(ua => ua.achievementId === achievement.id);
+        return {
+          ...achievement,
+          unlocked: !!unlocked,
+          unlockedAt: unlocked?.unlockedAt || null,
+        };
+      });
+
+      res.json(achievementsWithDetails);
+    } catch (error) {
+      console.error("Get achievements error:", error);
+      res.status(500).json({ message: "Failed to get achievements" });
+    }
   });
 
   app.get("/api/achievements/list", (req, res) => {
@@ -735,81 +958,145 @@ async function registerRoutes(httpServer, app) {
 
   // ==================== CLOUD SAVES ROUTES ====================
 
-  app.get("/api/cloud", authMiddleware, (req, res) => {
-    const userId = req.user.userId;
-    const saves = findMany("cloud_saves.json", (s) => s.userId === userId);
-    
-    const savesWithoutData = saves.map(({ data, ...save }) => save);
-    res.json(savesWithoutData);
+  app.get("/api/cloud", authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const savesResult = await query(
+        "SELECT id, user_id, game_id, save_name, created_at, updated_at FROM cloud_saves WHERE user_id = $1",
+        [userId]
+      );
+      
+      const saves = savesResult.rows.map(row => ({
+        id: row.id,
+        userId: row.user_id,
+        gameId: row.game_id,
+        filename: row.save_name,
+        uploadedAt: row.updated_at || row.created_at,
+      }));
+      
+      res.json(saves);
+    } catch (error) {
+      console.error("Get cloud saves error:", error);
+      res.status(500).json({ message: "Failed to get cloud saves" });
+    }
   });
 
-  app.get("/api/cloud/:saveId", authMiddleware, (req, res) => {
-    const userId = req.user.userId;
-    const { saveId } = req.params;
+  app.get("/api/cloud/:saveId", authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const { saveId } = req.params;
 
-    const save = findOne("cloud_saves.json", (s) => s.id === saveId && s.userId === userId);
-    if (!save) {
-      return res.status(404).json({ message: "Cloud save not found" });
+      const saveResult = await query(
+        "SELECT * FROM cloud_saves WHERE id = $1 AND user_id = $2",
+        [saveId, userId]
+      );
+
+      if (saveResult.rows.length === 0) {
+        return res.status(404).json({ message: "Cloud save not found" });
+      }
+
+      const save = dbCloudSaveToApiCloudSave(saveResult.rows[0]);
+      res.json(save);
+    } catch (error) {
+      console.error("Get cloud save error:", error);
+      res.status(500).json({ message: "Failed to get cloud save" });
     }
-
-    res.json(save);
   });
 
-  app.post("/api/cloud", authMiddleware, (req, res) => {
-    const userId = req.user.userId;
-    const { filename, data } = req.body;
+  app.post("/api/cloud", authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const { filename, data } = req.body;
 
-    if (!filename || !data) {
-      return res.status(400).json({ message: "Filename and data are required" });
+      if (!filename || !data) {
+        return res.status(400).json({ message: "Filename and data are required" });
+      }
+
+      const saveId = uuidv4();
+      await query(
+        `INSERT INTO cloud_saves (id, user_id, game_id, save_name, save_data, created_at, updated_at) 
+         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+        [saveId, userId, "default", filename, data]
+      );
+
+      res.status(201).json({
+        id: saveId,
+        userId,
+        filename,
+        uploadedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Create cloud save error:", error);
+      res.status(500).json({ message: "Failed to create cloud save" });
     }
-
-    const save = {
-      id: uuidv4(),
-      userId,
-      filename,
-      data,
-      uploadedAt: new Date().toISOString(),
-    };
-
-    insertOne("cloud_saves.json", save);
-
-    const { data: _, ...saveWithoutData } = save;
-    res.status(201).json(saveWithoutData);
   });
 
-  app.patch("/api/cloud/:saveId", authMiddleware, (req, res) => {
-    const userId = req.user.userId;
-    const { saveId } = req.params;
-    const { filename, data } = req.body;
+  app.patch("/api/cloud/:saveId", authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const { saveId } = req.params;
+      const { filename, data } = req.body;
 
-    const existing = findOne("cloud_saves.json", (s) => s.id === saveId && s.userId === userId);
-    if (!existing) {
-      return res.status(404).json({ message: "Cloud save not found" });
+      const existingResult = await query(
+        "SELECT * FROM cloud_saves WHERE id = $1 AND user_id = $2",
+        [saveId, userId]
+      );
+
+      if (existingResult.rows.length === 0) {
+        return res.status(404).json({ message: "Cloud save not found" });
+      }
+
+      const updates = ["updated_at = NOW()"];
+      const values = [];
+      let paramIndex = 1;
+
+      if (filename) {
+        updates.push(`save_name = $${paramIndex++}`);
+        values.push(filename);
+      }
+      if (data) {
+        updates.push(`save_data = $${paramIndex++}`);
+        values.push(data);
+      }
+
+      values.push(saveId);
+      const updateResult = await query(
+        `UPDATE cloud_saves SET ${updates.join(", ")} WHERE id = $${paramIndex} RETURNING *`,
+        values
+      );
+
+      const updated = updateResult.rows[0];
+      res.json({
+        id: updated.id,
+        userId: updated.user_id,
+        filename: updated.save_name,
+        uploadedAt: updated.updated_at,
+      });
+    } catch (error) {
+      console.error("Update cloud save error:", error);
+      res.status(500).json({ message: "Update failed" });
     }
-
-    const updates = { uploadedAt: new Date().toISOString() };
-    if (filename) updates.filename = filename;
-    if (data) updates.data = data;
-
-    const updated = updateOne("cloud_saves.json", (s) => s.id === saveId, updates);
-    if (!updated) {
-      return res.status(500).json({ message: "Update failed" });
-    }
-
-    const { data: _, ...saveWithoutData } = updated;
-    res.json(saveWithoutData);
   });
 
-  app.delete("/api/cloud/:saveId", authMiddleware, (req, res) => {
-    const userId = req.user.userId;
-    const { saveId } = req.params;
+  app.delete("/api/cloud/:saveId", authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const { saveId } = req.params;
 
-    const deleted = deleteOne("cloud_saves.json", (s) => s.id === saveId && s.userId === userId);
-    if (!deleted) {
-      return res.status(404).json({ message: "Cloud save not found" });
+      const deleteResult = await query(
+        "DELETE FROM cloud_saves WHERE id = $1 AND user_id = $2 RETURNING id",
+        [saveId, userId]
+      );
+
+      if (deleteResult.rows.length === 0) {
+        return res.status(404).json({ message: "Cloud save not found" });
+      }
+
+      res.json({ message: "Cloud save deleted" });
+    } catch (error) {
+      console.error("Delete cloud save error:", error);
+      res.status(500).json({ message: "Failed to delete cloud save" });
     }
-
-    res.json({ message: "Cloud save deleted" });
   });
 
   // ==================== EMAIL VERIFICATION ROUTES ====================
@@ -822,16 +1109,26 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "Verification token is required" });
       }
 
-      const user = findOne("users.json", (u) => u.verificationToken === token);
-      if (!user) {
+      const userResult = await query(
+        "SELECT * FROM users WHERE verification_token = $1",
+        [token]
+      );
+
+      if (userResult.rows.length === 0) {
         return res.status(400).json({ message: "Invalid verification token" });
       }
+
+      const user = dbUserToApiUser(userResult.rows[0]);
 
       if (user.verified) {
         return res.json({ message: "Email already verified" });
       }
 
-      updateOne("users.json", (u) => u.id === user.id, { verified: true, verificationToken: undefined });
+      await query(
+        "UPDATE users SET verified = true, verification_token = NULL WHERE id = $1",
+        [user.id]
+      );
+
       res.json({ message: "Email verified successfully" });
     } catch (error) {
       console.error("Verification error:", error);
@@ -841,20 +1138,31 @@ async function registerRoutes(httpServer, app) {
 
   // ==================== WALLET ROUTES ====================
 
-  app.get("/api/wallet", authMiddleware, (req, res) => {
-    const user = findOne("users.json", (u) => u.id === req.user.userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+  app.get("/api/wallet", authMiddleware, async (req, res) => {
+    try {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const user = dbUserToApiUser(userResult.rows[0]);
+
+      const transactionsResult = await query(
+        "SELECT * FROM wallet_transactions WHERE user_id = $1 ORDER BY created_at DESC",
+        [req.user.userId]
+      );
+
+      const transactions = transactionsResult.rows.map(dbTransactionToApiTransaction);
+
+      res.json({
+        balance: user.walletBalance || 0,
+        transactions,
+        ownedGames: user.ownedGames || [],
+      });
+    } catch (error) {
+      console.error("Get wallet error:", error);
+      res.status(500).json({ message: "Failed to get wallet" });
     }
-
-    const transactions = findMany("wallet_transactions.json", (t) => t.userId === req.user.userId);
-    transactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-    res.json({
-      balance: user.walletBalance || 0,
-      transactions,
-      ownedGames: user.ownedGames || [],
-    });
   });
 
   app.get("/api/wallet/stripe-key", async (req, res) => {
@@ -875,11 +1183,12 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "Amount must be between £5 and £100" });
       }
 
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
 
+      const user = dbUserToApiUser(userResult.rows[0]);
       const stripe = await getUncachableStripeClient();
       
       const baseUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
@@ -926,11 +1235,12 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "Session ID is required" });
       }
 
-      const existingTransaction = findOne("wallet_transactions.json", 
-        (t) => t.stripeSessionId === sessionId
+      const existingResult = await query(
+        "SELECT * FROM wallet_transactions WHERE reference_id = $1",
+        [sessionId]
       );
-      if (existingTransaction) {
-        return res.json({ message: "Payment already processed", balance: existingTransaction.amount });
+      if (existingResult.rows.length > 0) {
+        return res.json({ message: "Payment already processed", balance: parseFloat(existingResult.rows[0].amount) });
       }
 
       const stripe = await getUncachableStripeClient();
@@ -949,24 +1259,24 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "Invalid amount" });
       }
 
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
 
+      const user = dbUserToApiUser(userResult.rows[0]);
       const newBalance = (user.walletBalance || 0) + amount;
-      updateOne("users.json", (u) => u.id === user.id, { walletBalance: newBalance });
+      
+      await query(
+        "UPDATE users SET wallet_balance = $1 WHERE id = $2",
+        [newBalance, user.id]
+      );
 
-      const transaction = {
-        id: uuidv4(),
-        userId: user.id,
-        type: "deposit",
-        amount,
-        description: `Added $${amount} to wallet`,
-        stripeSessionId: sessionId,
-        timestamp: new Date().toISOString(),
-      };
-      insertOne("wallet_transactions.json", transaction);
+      await query(
+        `INSERT INTO wallet_transactions (id, user_id, amount, type, description, reference_id, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+        [uuidv4(), user.id, amount, "deposit", `Added £${amount} to wallet`, sessionId]
+      );
 
       res.json({ message: "Payment verified", balance: newBalance });
     } catch (error) {
@@ -990,23 +1300,24 @@ async function registerRoutes(httpServer, app) {
 
       const gameName = gameData.name;
 
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      const user = dbUserToApiUser(userResult.rows[0]);
 
       if ((user.ownedGames || []).includes(gameId)) {
         return res.status(400).json({ message: "You already own this game" });
       }
 
-      // Calculate price with Nexar+ discount if applicable
       let finalPrice = gameData.price;
       let discountApplied = 0;
       
       if (user.subscription?.active && gameData.nexarPlusDiscount) {
         discountApplied = gameData.nexarPlusDiscount;
         finalPrice = gameData.price * (1 - discountApplied / 100);
-        finalPrice = Math.round(finalPrice * 100) / 100; // Round to 2 decimal places
+        finalPrice = Math.round(finalPrice * 100) / 100;
       }
 
       if ((user.walletBalance || 0) < finalPrice) {
@@ -1016,22 +1327,17 @@ async function registerRoutes(httpServer, app) {
       const newBalance = (user.walletBalance || 0) - finalPrice;
       const newOwnedGames = [...(user.ownedGames || []), gameId];
       
-      updateOne("users.json", (u) => u.id === user.id, { 
-        walletBalance: newBalance,
-        ownedGames: newOwnedGames,
-      });
+      await query(
+        "UPDATE users SET wallet_balance = $1, owned_games = $2 WHERE id = $3",
+        [newBalance, newOwnedGames, user.id]
+      );
 
       const discountText = discountApplied > 0 ? ` (${discountApplied}% Nexar+ discount)` : "";
-      const transaction = {
-        id: uuidv4(),
-        userId: user.id,
-        type: "purchase",
-        amount: -finalPrice,
-        description: `Purchased ${gameName}${discountText}`,
-        gameId,
-        timestamp: new Date().toISOString(),
-      };
-      insertOne("wallet_transactions.json", transaction);
+      await query(
+        `INSERT INTO wallet_transactions (id, user_id, amount, type, description, reference_id, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+        [uuidv4(), user.id, -finalPrice, "purchase", `Purchased ${gameName}${discountText}`, gameId]
+      );
 
       res.json({ 
         message: "Game purchased successfully", 
@@ -1070,8 +1376,8 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "PIN must be 4-8 digits" });
       }
 
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
 
@@ -1082,7 +1388,12 @@ async function registerRoutes(httpServer, app) {
         parentPin: hashedPin,
       };
 
-      updateOne("users.json", (u) => u.id === user.id, { parentalControls });
+      const currentProfile = userResult.rows[0].developer_profile || {};
+      await query(
+        "UPDATE users SET developer_profile = $1 WHERE id = $2",
+        [{ ...currentProfile, parentalControls }, req.user.userId]
+      );
+
       res.json({ message: "Parental controls enabled" });
     } catch (error) {
       console.error("Enable parental controls error:", error);
@@ -1098,8 +1409,13 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "PIN is required" });
       }
 
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user || !user.parentalControls?.enabled) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const user = dbUserToApiUser(userResult.rows[0]);
+      if (!user.parentalControls?.enabled) {
         return res.status(400).json({ message: "Parental controls not enabled" });
       }
 
@@ -1108,9 +1424,12 @@ async function registerRoutes(httpServer, app) {
         return res.status(401).json({ message: "Invalid PIN" });
       }
 
-      updateOne("users.json", (u) => u.id === user.id, { 
-        parentalControls: getDefaultParentalControls() 
-      });
+      const currentProfile = userResult.rows[0].developer_profile || {};
+      await query(
+        "UPDATE users SET developer_profile = $1 WHERE id = $2",
+        [{ ...currentProfile, parentalControls: getDefaultParentalControls() }, req.user.userId]
+      );
+
       res.json({ message: "Parental controls disabled" });
     } catch (error) {
       console.error("Disable parental controls error:", error);
@@ -1126,8 +1445,13 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ valid: false });
       }
 
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user || !user.parentalControls?.enabled) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
+        return res.status(400).json({ valid: false });
+      }
+
+      const user = dbUserToApiUser(userResult.rows[0]);
+      if (!user.parentalControls?.enabled) {
         return res.status(400).json({ valid: false });
       }
 
@@ -1163,8 +1487,13 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "PIN is required" });
       }
 
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user || !user.parentalControls?.enabled) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const user = dbUserToApiUser(userResult.rows[0]);
+      if (!user.parentalControls?.enabled) {
         return res.status(400).json({ message: "Parental controls not enabled" });
       }
 
@@ -1182,7 +1511,11 @@ async function registerRoutes(httpServer, app) {
       if (requiresParentApproval !== undefined) updates.requiresParentApproval = requiresParentApproval;
 
       const newParentalControls = { ...user.parentalControls, ...updates };
-      updateOne("users.json", (u) => u.id === user.id, { parentalControls: newParentalControls });
+      const currentProfile = userResult.rows[0].developer_profile || {};
+      await query(
+        "UPDATE users SET developer_profile = $1 WHERE id = $2",
+        [{ ...currentProfile, parentalControls: newParentalControls }, req.user.userId]
+      );
       
       res.json({ message: "Settings updated", parentalControls: newParentalControls });
     } catch (error) {
@@ -1191,17 +1524,18 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  app.get("/api/parental/status", authMiddleware, (req, res) => {
+  app.get("/api/parental/status", authMiddleware, async (req, res) => {
     try {
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
 
+      const user = dbUserToApiUser(userResult.rows[0]);
       const parentalControls = user.parentalControls || getDefaultParentalControls();
       
       const today = new Date().toISOString().split("T")[0];
-      if (parentalControls.dailyPlaytimeLog.date !== today) {
+      if (parentalControls.dailyPlaytimeLog?.date !== today) {
         parentalControls.dailyPlaytimeLog = { date: today, minutesPlayed: 0 };
       }
 
@@ -1215,18 +1549,20 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  app.post("/api/parental/checkAccess", authMiddleware, (req, res) => {
+  app.post("/api/parental/checkAccess", authMiddleware, async (req, res) => {
     try {
       const { gameId, rating, gameRating } = req.body;
       const rawRating = gameRating || rating;
       const contentRating = rawRating ? (LEGACY_RATING_MAP[rawRating] || rawRating) : null;
 
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
 
+      const user = dbUserToApiUser(userResult.rows[0]);
       const parentalControls = user.parentalControls;
+      
       if (!parentalControls?.enabled) {
         return res.json({ allowed: true });
       }
@@ -1238,8 +1574,8 @@ async function registerRoutes(httpServer, app) {
 
       const today = new Date().toISOString().split("T")[0];
       if (parentalControls.playtimeLimit !== null) {
-        let minutesPlayed = parentalControls.dailyPlaytimeLog.minutesPlayed;
-        if (parentalControls.dailyPlaytimeLog.date !== today) {
+        let minutesPlayed = parentalControls.dailyPlaytimeLog?.minutesPlayed || 0;
+        if (parentalControls.dailyPlaytimeLog?.date !== today) {
           minutesPlayed = 0;
         }
         if (minutesPlayed >= parentalControls.playtimeLimit) {
@@ -1265,8 +1601,13 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "PIN is required" });
       }
 
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user || !user.parentalControls?.enabled) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const user = dbUserToApiUser(userResult.rows[0]);
+      if (!user.parentalControls?.enabled) {
         return res.status(400).json({ message: "Parental controls not enabled" });
       }
 
@@ -1282,7 +1623,7 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  app.post("/api/parental/logPlaytime", authMiddleware, (req, res) => {
+  app.post("/api/parental/logPlaytime", authMiddleware, async (req, res) => {
     try {
       const { minutes } = req.body;
 
@@ -1290,20 +1631,26 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "Invalid minutes" });
       }
 
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
 
+      const user = dbUserToApiUser(userResult.rows[0]);
       const parentalControls = user.parentalControls || getDefaultParentalControls();
       const today = new Date().toISOString().split("T")[0];
 
-      if (parentalControls.dailyPlaytimeLog.date !== today) {
+      if (parentalControls.dailyPlaytimeLog?.date !== today) {
         parentalControls.dailyPlaytimeLog = { date: today, minutesPlayed: 0 };
       }
 
       parentalControls.dailyPlaytimeLog.minutesPlayed += minutes;
-      updateOne("users.json", (u) => u.id === user.id, { parentalControls });
+      
+      const currentProfile = userResult.rows[0].developer_profile || {};
+      await query(
+        "UPDATE users SET developer_profile = $1 WHERE id = $2",
+        [{ ...currentProfile, parentalControls }, req.user.userId]
+      );
 
       res.json({ 
         minutesPlayed: parentalControls.dailyPlaytimeLog.minutesPlayed,
@@ -1315,14 +1662,16 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  app.post("/api/parental/checkPurchase", authMiddleware, (req, res) => {
+  app.post("/api/parental/checkPurchase", authMiddleware, async (req, res) => {
     try {
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
 
+      const user = dbUserToApiUser(userResult.rows[0]);
       const parentalControls = user.parentalControls;
+      
       if (!parentalControls?.enabled) {
         return res.json({ allowed: true, requiresApproval: false });
       }
@@ -1344,27 +1693,34 @@ async function registerRoutes(httpServer, app) {
 
   // ==================== NEXAR+ SUBSCRIPTION ROUTES ====================
 
-  // Get subscription status
-  app.get("/api/subscription/status", authMiddleware, (req, res) => {
-    const user = findOne("users.json", (u) => u.id === req.user.userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.json({
-      active: user.subscription?.active || false,
-      renewalDate: user.subscription?.renewalDate || "",
-      stripeSubscriptionId: user.subscription?.stripeSubscriptionId || "",
-    });
-  });
-
-  // Create Stripe subscription checkout session
-  app.post("/api/subscription/create-checkout", authMiddleware, async (req, res) => {
+  app.get("/api/subscription/status", authMiddleware, async (req, res) => {
     try {
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      const user = dbUserToApiUser(userResult.rows[0]);
+
+      res.json({
+        active: user.subscription?.active || false,
+        renewalDate: user.subscription?.renewalDate || "",
+        stripeSubscriptionId: user.subscription?.stripeSubscriptionId || "",
+      });
+    } catch (error) {
+      console.error("Get subscription status error:", error);
+      res.status(500).json({ message: "Failed to get subscription status" });
+    }
+  });
+
+  app.post("/api/subscription/create-checkout", authMiddleware, async (req, res) => {
+    try {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const user = dbUserToApiUser(userResult.rows[0]);
 
       if (user.subscription?.active) {
         return res.status(400).json({ message: "Already subscribed to Nexar+" });
@@ -1378,7 +1734,6 @@ async function registerRoutes(httpServer, app) {
           ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
           : 'http://localhost:5000';
 
-      // Create or get Stripe customer
       let customerId = user.subscription?.stripeCustomerId;
       if (!customerId) {
         const customer = await stripe.customers.create({
@@ -1419,7 +1774,6 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  // Verify subscription after checkout
   app.post("/api/subscription/verify", authMiddleware, async (req, res) => {
     try {
       const { sessionId } = req.body;
@@ -1444,14 +1798,21 @@ async function registerRoutes(httpServer, app) {
 
       const renewalDate = new Date(subscription.current_period_end * 1000).toISOString();
 
-      updateOne("users.json", (u) => u.id === req.user.userId, {
-        subscription: {
-          active: true,
-          renewalDate,
-          stripeCustomerId: session.customer,
-          stripeSubscriptionId: subscriptionId,
-        },
-      });
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      const currentProfile = userResult.rows[0].developer_profile || {};
+      
+      await query(
+        "UPDATE users SET developer_profile = $1 WHERE id = $2",
+        [{
+          ...currentProfile,
+          subscription: {
+            active: true,
+            renewalDate,
+            stripeCustomerId: session.customer,
+            stripeSubscriptionId: subscriptionId,
+          }
+        }, req.user.userId]
+      );
 
       res.json({ 
         success: true, 
@@ -1466,13 +1827,14 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  // Cancel subscription
   app.post("/api/subscription/cancel", authMiddleware, async (req, res) => {
     try {
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      const user = dbUserToApiUser(userResult.rows[0]);
 
       if (!user.subscription?.active || !user.subscription.stripeSubscriptionId) {
         return res.status(400).json({ message: "No active subscription to cancel" });
@@ -1481,12 +1843,17 @@ async function registerRoutes(httpServer, app) {
       const stripe = await getUncachableStripeClient();
       await stripe.subscriptions.cancel(user.subscription.stripeSubscriptionId);
 
-      updateOne("users.json", (u) => u.id === req.user.userId, {
-        subscription: {
-          ...user.subscription,
-          active: false,
-        },
-      });
+      const currentProfile = userResult.rows[0].developer_profile || {};
+      await query(
+        "UPDATE users SET developer_profile = $1 WHERE id = $2",
+        [{
+          ...currentProfile,
+          subscription: {
+            ...user.subscription,
+            active: false,
+          }
+        }, req.user.userId]
+      );
 
       res.json({ success: true, message: "Subscription cancelled successfully" });
     } catch (error) {
@@ -1497,13 +1864,11 @@ async function registerRoutes(httpServer, app) {
 
   // ==================== GAME TRIAL ROUTES ====================
 
-  // Get game metadata (for frontend)
   app.get("/api/games/metadata", (req, res) => {
     res.json(GAME_CATALOG);
   });
 
-  // Check trial access
-  app.post("/api/games/trial/check", authMiddleware, (req, res) => {
+  app.post("/api/games/trial/check", authMiddleware, async (req, res) => {
     try {
       const { gameId } = req.body;
       
@@ -1520,10 +1885,12 @@ async function registerRoutes(httpServer, app) {
         return res.json({ allowed: false, reason: "Trial not available for this game" });
       }
 
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      const user = dbUserToApiUser(userResult.rows[0]);
 
       if (!user.subscription?.active) {
         return res.json({ allowed: false, reason: "Nexar+ subscription required for game trials" });
@@ -1550,8 +1917,7 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  // Update trial usage
-  app.post("/api/games/trial/update", authMiddleware, (req, res) => {
+  app.post("/api/games/trial/update", authMiddleware, async (req, res) => {
     try {
       const { gameId, minutesPlayed } = req.body;
       
@@ -1564,10 +1930,12 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "Trial not available for this game" });
       }
 
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      const user = dbUserToApiUser(userResult.rows[0]);
 
       const currentUsage = user.trialUsage?.[gameId] || { minutesPlayed: 0, expired: false };
       const newMinutesPlayed = currentUsage.minutesPlayed + minutesPlayed;
@@ -1575,16 +1943,18 @@ async function registerRoutes(httpServer, app) {
       const expired = newMinutesPlayed >= trialDuration;
 
       const updatedTrialUsage = {
-        ...user.trialUsage,
+        ...(user.trialUsage || {}),
         [gameId]: {
           minutesPlayed: newMinutesPlayed,
           expired,
         },
       };
 
-      updateOne("users.json", (u) => u.id === req.user.userId, {
-        trialUsage: updatedTrialUsage,
-      });
+      const currentProfile = userResult.rows[0].developer_profile || {};
+      await query(
+        "UPDATE users SET developer_profile = $1 WHERE id = $2",
+        [{ ...currentProfile, trialUsage: updatedTrialUsage }, req.user.userId]
+      );
 
       res.json({ 
         success: true, 
@@ -1597,8 +1967,7 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  // Check Nexar+ collection access
-  app.post("/api/games/nexarplus/check", authMiddleware, (req, res) => {
+  app.post("/api/games/nexarplus/check", authMiddleware, async (req, res) => {
     try {
       const { gameId } = req.body;
       
@@ -1615,10 +1984,12 @@ async function registerRoutes(httpServer, app) {
         return res.json({ allowed: true, isNexarPlusGame: false });
       }
 
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      const user = dbUserToApiUser(userResult.rows[0]);
 
       if (!user.subscription?.active) {
         return res.json({ 
@@ -1635,8 +2006,7 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  // Get discounted price for a game
-  app.get("/api/games/:gameId/price", authMiddleware, (req, res) => {
+  app.get("/api/games/:gameId/price", authMiddleware, async (req, res) => {
     try {
       const { gameId } = req.params;
       
@@ -1645,10 +2015,12 @@ async function registerRoutes(httpServer, app) {
         return res.status(404).json({ message: "Game not found" });
       }
 
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      const user = dbUserToApiUser(userResult.rows[0]);
 
       const basePrice = game.price;
       let discountedPrice = basePrice;
@@ -1675,8 +2047,7 @@ async function registerRoutes(httpServer, app) {
   // DEVELOPER PROGRAMME ROUTES
   // ========================================
 
-  // Apply as developer
-  app.post("/api/developer/apply", authMiddleware, (req, res) => {
+  app.post("/api/developer/apply", authMiddleware, async (req, res) => {
     try {
       const { studioName, contactEmail, website, description } = req.body;
 
@@ -1684,10 +2055,12 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "Studio name, contact email, and description are required" });
       }
 
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      const user = dbUserToApiUser(userResult.rows[0]);
 
       if (user.developerProfile?.status === "pending") {
         return res.status(400).json({ message: "You already have a pending application" });
@@ -1705,9 +2078,11 @@ async function registerRoutes(httpServer, app) {
         status: "pending",
       };
 
-      updateOne("users.json", (u) => u.id === req.user.userId, {
-        developerProfile,
-      });
+      const currentProfile = userResult.rows[0].developer_profile || {};
+      await query(
+        "UPDATE users SET developer_profile = $1 WHERE id = $2",
+        [{ ...currentProfile, ...developerProfile }, req.user.userId]
+      );
 
       res.json({ success: true, message: "Application submitted successfully" });
     } catch (error) {
@@ -1716,13 +2091,14 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  // Get developer status
-  app.get("/api/developer/status", authMiddleware, (req, res) => {
+  app.get("/api/developer/status", authMiddleware, async (req, res) => {
     try {
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      const user = dbUserToApiUser(userResult.rows[0]);
 
       res.json({
         role: user.role || "user",
@@ -1734,23 +2110,27 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  // Admin: Get all developer applications
-  app.get("/api/admin/developer/applications", authMiddleware, (req, res) => {
+  app.get("/api/admin/developer/applications", authMiddleware, async (req, res) => {
     try {
-      const adminUser = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!adminUser || adminUser.role !== "admin") {
+      const adminResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (adminResult.rows.length === 0 || adminResult.rows[0].role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
       }
 
-      const applications = findMany("users.json", (u) => 
-        u.developerProfile?.status === "pending"
-      ).map(u => ({
-        userId: u.id,
-        username: u.username,
-        email: u.email,
-        developerProfile: u.developerProfile,
-        createdAt: u.createdAt,
-      }));
+      const applicationsResult = await query(
+        "SELECT * FROM users WHERE developer_profile->>'status' = 'pending'"
+      );
+
+      const applications = applicationsResult.rows.map(row => {
+        const user = dbUserToApiUser(row);
+        return {
+          userId: user.id,
+          username: user.username,
+          email: user.email,
+          developerProfile: user.developerProfile,
+          createdAt: user.createdAt,
+        };
+      });
 
       res.json(applications);
     } catch (error) {
@@ -1759,13 +2139,12 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  // Admin: Approve developer
-  app.post("/api/admin/developer/approve", authMiddleware, (req, res) => {
+  app.post("/api/admin/developer/approve", authMiddleware, async (req, res) => {
     try {
       const { userId } = req.body;
 
-      const adminUser = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!adminUser || adminUser.role !== "admin") {
+      const adminResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (adminResult.rows.length === 0 || adminResult.rows[0].role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -1773,22 +2152,22 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "User ID is required" });
       }
 
-      const targetUser = findOne("users.json", (u) => u.id === userId);
-      if (!targetUser) {
+      const targetResult = await query("SELECT * FROM users WHERE id = $1", [userId]);
+      if (targetResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      const targetUser = dbUserToApiUser(targetResult.rows[0]);
 
       if (!targetUser.developerProfile) {
         return res.status(400).json({ message: "User has no developer application" });
       }
 
-      updateOne("users.json", (u) => u.id === userId, {
-        role: "developer",
-        developerProfile: {
-          ...targetUser.developerProfile,
-          status: "approved",
-        },
-      });
+      const currentProfile = targetResult.rows[0].developer_profile || {};
+      await query(
+        "UPDATE users SET role = 'developer', developer_profile = $1 WHERE id = $2",
+        [{ ...currentProfile, status: "approved" }, userId]
+      );
 
       res.json({ success: true, message: "Developer approved" });
     } catch (error) {
@@ -1797,13 +2176,12 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  // Admin: Reject developer
-  app.post("/api/admin/developer/reject", authMiddleware, (req, res) => {
+  app.post("/api/admin/developer/reject", authMiddleware, async (req, res) => {
     try {
       const { userId } = req.body;
 
-      const adminUser = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!adminUser || adminUser.role !== "admin") {
+      const adminResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (adminResult.rows.length === 0 || adminResult.rows[0].role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -1811,21 +2189,22 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "User ID is required" });
       }
 
-      const targetUser = findOne("users.json", (u) => u.id === userId);
-      if (!targetUser) {
+      const targetResult = await query("SELECT * FROM users WHERE id = $1", [userId]);
+      if (targetResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      const targetUser = dbUserToApiUser(targetResult.rows[0]);
 
       if (!targetUser.developerProfile) {
         return res.status(400).json({ message: "User has no developer application" });
       }
 
-      updateOne("users.json", (u) => u.id === userId, {
-        developerProfile: {
-          ...targetUser.developerProfile,
-          status: "rejected",
-        },
-      });
+      const currentProfile = targetResult.rows[0].developer_profile || {};
+      await query(
+        "UPDATE users SET developer_profile = $1 WHERE id = $2",
+        [{ ...currentProfile, status: "rejected" }, userId]
+      );
 
       res.json({ success: true, message: "Developer rejected" });
     } catch (error) {
@@ -1838,15 +2217,16 @@ async function registerRoutes(httpServer, app) {
   // DEVELOPER GAME ROUTES
   // ========================================
 
-  // Create a new game
-  app.post("/api/developer/game/create", authMiddleware, (req, res) => {
+  app.post("/api/developer/game/create", authMiddleware, async (req, res) => {
     try {
       const { title, description, price, genre, tags, coverImage } = req.body;
 
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      const user = dbUserToApiUser(userResult.rows[0]);
 
       if (user.role !== "developer" || user.developerProfile?.status !== "approved") {
         return res.status(403).json({ message: "Only approved developers can create games" });
@@ -1856,22 +2236,15 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "Title, description, price, and genre are required" });
       }
 
-      const game = {
-        gameId: uuidv4(),
-        developerId: user.id,
-        title,
-        description,
-        price,
-        genre,
-        tags: tags || [],
-        status: "draft",
-        versions: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        coverImage: coverImage || "",
-      };
+      const gameId = uuidv4();
+      await query(
+        `INSERT INTO developer_games (id, game_id, developer_id, title, description, genre, tags, price, cover_image, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'draft', NOW(), NOW())`,
+        [uuidv4(), gameId, user.id, title, description, genre, tags || [], price, coverImage || ""]
+      );
 
-      insertOne("developerGames.json", game);
+      const gameResult = await query("SELECT * FROM developer_games WHERE game_id = $1", [gameId]);
+      const game = dbDevGameToApiDevGame(gameResult.rows[0]);
 
       res.json({ success: true, game });
     } catch (error) {
@@ -1880,8 +2253,7 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  // Update a game
-  app.post("/api/developer/game/update", authMiddleware, (req, res) => {
+  app.post("/api/developer/game/update", authMiddleware, async (req, res) => {
     try {
       const { gameId, title, description, price, genre, tags, coverImage } = req.body;
 
@@ -1889,32 +2261,60 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "Game ID is required" });
       }
 
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
 
-      const game = findOne("developerGames.json", (g) => g.gameId === gameId);
-      if (!game) {
+      const user = dbUserToApiUser(userResult.rows[0]);
+
+      const gameResult = await query("SELECT * FROM developer_games WHERE game_id = $1", [gameId]);
+      if (gameResult.rows.length === 0) {
         return res.status(404).json({ message: "Game not found" });
       }
+
+      const game = dbDevGameToApiDevGame(gameResult.rows[0]);
 
       if (game.developerId !== user.id) {
         return res.status(403).json({ message: "You can only edit your own games" });
       }
 
-      const updates = {
-        updatedAt: new Date().toISOString(),
-      };
+      const updates = ["updated_at = NOW()"];
+      const values = [];
+      let paramIndex = 1;
 
-      if (title) updates.title = title;
-      if (description) updates.description = description;
-      if (typeof price === "number") updates.price = price;
-      if (genre) updates.genre = genre;
-      if (tags) updates.tags = tags;
-      if (coverImage !== undefined) updates.coverImage = coverImage;
+      if (title) {
+        updates.push(`title = $${paramIndex++}`);
+        values.push(title);
+      }
+      if (description) {
+        updates.push(`description = $${paramIndex++}`);
+        values.push(description);
+      }
+      if (typeof price === "number") {
+        updates.push(`price = $${paramIndex++}`);
+        values.push(price);
+      }
+      if (genre) {
+        updates.push(`genre = $${paramIndex++}`);
+        values.push(genre);
+      }
+      if (tags) {
+        updates.push(`tags = $${paramIndex++}`);
+        values.push(tags);
+      }
+      if (coverImage !== undefined) {
+        updates.push(`cover_image = $${paramIndex++}`);
+        values.push(coverImage);
+      }
 
-      const updatedGame = updateOne("developerGames.json", (g) => g.gameId === gameId, updates);
+      values.push(gameId);
+      const updateResult = await query(
+        `UPDATE developer_games SET ${updates.join(", ")} WHERE game_id = $${paramIndex} RETURNING *`,
+        values
+      );
+
+      const updatedGame = dbDevGameToApiDevGame(updateResult.rows[0]);
 
       res.json({ success: true, game: updatedGame });
     } catch (error) {
@@ -1923,8 +2323,7 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  // Submit game for review
-  app.post("/api/developer/game/submitForReview", authMiddleware, (req, res) => {
+  app.post("/api/developer/game/submitForReview", authMiddleware, async (req, res) => {
     try {
       const { gameId } = req.body;
 
@@ -1932,15 +2331,19 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "Game ID is required" });
       }
 
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
 
-      const game = findOne("developerGames.json", (g) => g.gameId === gameId);
-      if (!game) {
+      const user = dbUserToApiUser(userResult.rows[0]);
+
+      const gameResult = await query("SELECT * FROM developer_games WHERE game_id = $1", [gameId]);
+      if (gameResult.rows.length === 0) {
         return res.status(404).json({ message: "Game not found" });
       }
+
+      const game = dbDevGameToApiDevGame(gameResult.rows[0]);
 
       if (game.developerId !== user.id) {
         return res.status(403).json({ message: "You can only submit your own games" });
@@ -1950,10 +2353,10 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "Only draft or rejected games can be submitted for review" });
       }
 
-      updateOne("developerGames.json", (g) => g.gameId === gameId, {
-        status: "pending",
-        updatedAt: new Date().toISOString(),
-      });
+      await query(
+        "UPDATE developer_games SET status = 'pending', updated_at = NOW() WHERE game_id = $1",
+        [gameId]
+      );
 
       res.json({ success: true, message: "Game submitted for review" });
     } catch (error) {
@@ -1962,19 +2365,25 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  // Get developer's games
-  app.get("/api/developer/games", authMiddleware, (req, res) => {
+  app.get("/api/developer/games", authMiddleware, async (req, res) => {
     try {
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      const user = dbUserToApiUser(userResult.rows[0]);
 
       if (user.role !== "developer" || user.developerProfile?.status !== "approved") {
         return res.status(403).json({ message: "Only approved developers can view their games" });
       }
 
-      const games = findMany("developerGames.json", (g) => g.developerId === user.id);
+      const gamesResult = await query(
+        "SELECT * FROM developer_games WHERE developer_id = $1",
+        [user.id]
+      );
+
+      const games = gamesResult.rows.map(dbDevGameToApiDevGame);
 
       res.json(games);
     } catch (error) {
@@ -1983,20 +2392,23 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  // Get single game for editing
-  app.get("/api/developer/game/:gameId", authMiddleware, (req, res) => {
+  app.get("/api/developer/game/:gameId", authMiddleware, async (req, res) => {
     try {
       const { gameId } = req.params;
 
-      const user = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
 
-      const game = findOne("developerGames.json", (g) => g.gameId === gameId);
-      if (!game) {
+      const user = dbUserToApiUser(userResult.rows[0]);
+
+      const gameResult = await query("SELECT * FROM developer_games WHERE game_id = $1", [gameId]);
+      if (gameResult.rows.length === 0) {
         return res.status(404).json({ message: "Game not found" });
       }
+
+      const game = dbDevGameToApiDevGame(gameResult.rows[0]);
 
       if (game.developerId !== user.id) {
         return res.status(403).json({ message: "You can only view your own games" });
@@ -2009,18 +2421,34 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  // Admin: Get all pending games
-  app.get("/api/admin/games/pending", authMiddleware, (req, res) => {
+  app.get("/api/admin/games/pending", authMiddleware, async (req, res) => {
     try {
-      const adminUser = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!adminUser || adminUser.role !== "admin") {
+      const adminResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (adminResult.rows.length === 0 || adminResult.rows[0].role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
       }
 
-      const pendingGames = findMany("developerGames.json", (g) => g.status === "pending");
+      const pendingGamesResult = await query(
+        "SELECT * FROM developer_games WHERE status = 'pending'"
+      );
 
-      const gamesWithDeveloper = pendingGames.map(game => {
-        const developer = findOne("users.json", (u) => u.id === game.developerId);
+      const developerIds = [...new Set(pendingGamesResult.rows.map(g => g.developer_id))];
+      let developersMap = {};
+      
+      if (developerIds.length > 0) {
+        const developersResult = await query(
+          "SELECT * FROM users WHERE id = ANY($1)",
+          [developerIds]
+        );
+        developersResult.rows.forEach(row => {
+          const dev = dbUserToApiUser(row);
+          developersMap[dev.id] = dev;
+        });
+      }
+
+      const gamesWithDeveloper = pendingGamesResult.rows.map(row => {
+        const game = dbDevGameToApiDevGame(row);
+        const developer = developersMap[game.developerId];
         return {
           ...game,
           developerName: developer?.developerProfile?.studioName || developer?.username || "Unknown",
@@ -2034,13 +2462,12 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  // Admin: Approve game
-  app.post("/api/admin/game/approve", authMiddleware, (req, res) => {
+  app.post("/api/admin/game/approve", authMiddleware, async (req, res) => {
     try {
       const { gameId } = req.body;
 
-      const adminUser = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!adminUser || adminUser.role !== "admin") {
+      const adminResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (adminResult.rows.length === 0 || adminResult.rows[0].role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -2048,30 +2475,28 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "Game ID is required" });
       }
 
-      const game = findOne("developerGames.json", (g) => g.gameId === gameId);
-      if (!game) {
+      const gameResult = await query("SELECT * FROM developer_games WHERE game_id = $1", [gameId]);
+      if (gameResult.rows.length === 0) {
         return res.status(404).json({ message: "Game not found" });
       }
 
-      updateOne("developerGames.json", (g) => g.gameId === gameId, {
-        status: "approved",
-        updatedAt: new Date().toISOString(),
-      });
+      const game = dbDevGameToApiDevGame(gameResult.rows[0]);
+
+      await query(
+        "UPDATE developer_games SET status = 'approved', updated_at = NOW() WHERE game_id = $1",
+        [gameId]
+      );
 
       // Award developer achievement if this is their first approved game
-      const developer = findOne("users.json", (u) => u.id === game.developerId);
-      if (developer) {
-        const existingAchievement = findOne("achievements.json", 
-          (a) => a.userId === developer.id && a.achievementId === "developer"
+      const existingAchResult = await query(
+        "SELECT id FROM achievements WHERE user_id = $1 AND achievement_id = $2",
+        [game.developerId, "developer"]
+      );
+      if (existingAchResult.rows.length === 0) {
+        await query(
+          "INSERT INTO achievements (id, user_id, achievement_id, unlocked_at) VALUES ($1, $2, $3, NOW())",
+          [uuidv4(), game.developerId, "developer"]
         );
-        if (!existingAchievement) {
-          insertOne("achievements.json", {
-            id: uuidv4(),
-            userId: developer.id,
-            achievementId: "developer",
-            unlockedAt: new Date().toISOString(),
-          });
-        }
       }
 
       res.json({ success: true, message: "Game approved" });
@@ -2081,13 +2506,12 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  // Admin: Reject game
-  app.post("/api/admin/game/reject", authMiddleware, (req, res) => {
+  app.post("/api/admin/game/reject", authMiddleware, async (req, res) => {
     try {
       const { gameId, reason } = req.body;
 
-      const adminUser = findOne("users.json", (u) => u.id === req.user.userId);
-      if (!adminUser || adminUser.role !== "admin") {
+      const adminResult = await query("SELECT * FROM users WHERE id = $1", [req.user.userId]);
+      if (adminResult.rows.length === 0 || adminResult.rows[0].role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -2095,15 +2519,15 @@ async function registerRoutes(httpServer, app) {
         return res.status(400).json({ message: "Game ID is required" });
       }
 
-      const game = findOne("developerGames.json", (g) => g.gameId === gameId);
-      if (!game) {
+      const gameResult = await query("SELECT * FROM developer_games WHERE game_id = $1", [gameId]);
+      if (gameResult.rows.length === 0) {
         return res.status(404).json({ message: "Game not found" });
       }
 
-      updateOne("developerGames.json", (g) => g.gameId === gameId, {
-        status: "rejected",
-        updatedAt: new Date().toISOString(),
-      });
+      await query(
+        "UPDATE developer_games SET status = 'rejected', updated_at = NOW() WHERE game_id = $1",
+        [gameId]
+      );
 
       res.json({ success: true, message: "Game rejected" });
     } catch (error) {
@@ -2112,13 +2536,29 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  // Get approved developer games for store
-  app.get("/api/store/developer-games", (req, res) => {
+  app.get("/api/store/developer-games", async (req, res) => {
     try {
-      const approvedGames = findMany("developerGames.json", (g) => g.status === "approved");
+      const approvedGamesResult = await query(
+        "SELECT * FROM developer_games WHERE status = 'approved'"
+      );
 
-      const gamesWithDeveloper = approvedGames.map(game => {
-        const developer = findOne("users.json", (u) => u.id === game.developerId);
+      const developerIds = [...new Set(approvedGamesResult.rows.map(g => g.developer_id))];
+      let developersMap = {};
+      
+      if (developerIds.length > 0) {
+        const developersResult = await query(
+          "SELECT * FROM users WHERE id = ANY($1)",
+          [developerIds]
+        );
+        developersResult.rows.forEach(row => {
+          const dev = dbUserToApiUser(row);
+          developersMap[dev.id] = dev;
+        });
+      }
+
+      const gamesWithDeveloper = approvedGamesResult.rows.map(row => {
+        const game = dbDevGameToApiDevGame(row);
+        const developer = developersMap[game.developerId];
         return {
           id: `dev-${game.gameId}`,
           gameId: game.gameId,
@@ -2140,22 +2580,20 @@ async function registerRoutes(httpServer, app) {
     }
   });
 
-  // Admin: Set user as admin (for initial setup)
   app.post("/api/admin/set-admin", async (req, res) => {
     try {
       const { email, secret } = req.body;
       
-      // Simple secret check for initial admin setup
       if (secret !== process.env.ADMIN_SECRET && secret !== "nexaros-admin-setup-2024") {
         return res.status(403).json({ message: "Invalid secret" });
       }
 
-      const user = findOne("users.json", (u) => u.email === email);
-      if (!user) {
+      const userResult = await query("SELECT * FROM users WHERE email = $1", [email]);
+      if (userResult.rows.length === 0) {
         return res.status(404).json({ message: "User not found" });
       }
 
-      updateOne("users.json", (u) => u.email === email, { role: "admin" });
+      await query("UPDATE users SET role = 'admin' WHERE email = $1", [email]);
       res.json({ success: true, message: "User promoted to admin" });
     } catch (error) {
       console.error("Set admin error:", error);
