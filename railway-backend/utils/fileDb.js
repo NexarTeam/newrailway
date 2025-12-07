@@ -1,7 +1,7 @@
-import fs from "fs";
-import path from "path";
+const fs = require("fs");
+const path = require("path");
 
-const DATA_DIR = path.join(process.cwd(), "server", "data");
+const DATA_DIR = path.join(process.cwd(), "data");
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -9,7 +9,7 @@ function ensureDataDir() {
   }
 }
 
-export function readJson<T>(filename: string): T[] {
+function readJson(filename) {
   ensureDataDir();
   const filePath = path.join(DATA_DIR, filename);
   if (!fs.existsSync(filePath)) {
@@ -18,47 +18,37 @@ export function readJson<T>(filename: string): T[] {
   }
   const data = fs.readFileSync(filePath, "utf-8");
   try {
-    return JSON.parse(data) as T[];
+    return JSON.parse(data);
   } catch {
     return [];
   }
 }
 
-export function writeJson<T>(filename: string, data: T[]): void {
+function writeJson(filename, data) {
   ensureDataDir();
   const filePath = path.join(DATA_DIR, filename);
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
 }
 
-export function findOne<T extends Record<string, any>>(
-  filename: string,
-  predicate: (item: T) => boolean
-): T | undefined {
-  const data = readJson<T>(filename);
+function findOne(filename, predicate) {
+  const data = readJson(filename);
   return data.find(predicate);
 }
 
-export function findMany<T extends Record<string, any>>(
-  filename: string,
-  predicate: (item: T) => boolean
-): T[] {
-  const data = readJson<T>(filename);
+function findMany(filename, predicate) {
+  const data = readJson(filename);
   return data.filter(predicate);
 }
 
-export function insertOne<T>(filename: string, item: T): T {
-  const data = readJson<T>(filename);
+function insertOne(filename, item) {
+  const data = readJson(filename);
   data.push(item);
   writeJson(filename, data);
   return item;
 }
 
-export function updateOne<T extends Record<string, any>>(
-  filename: string,
-  predicate: (item: T) => boolean,
-  updates: Partial<T>
-): T | null {
-  const data = readJson<T>(filename);
+function updateOne(filename, predicate, updates) {
+  const data = readJson(filename);
   const index = data.findIndex(predicate);
   if (index === -1) return null;
   data[index] = { ...data[index], ...updates };
@@ -66,14 +56,21 @@ export function updateOne<T extends Record<string, any>>(
   return data[index];
 }
 
-export function deleteOne<T extends Record<string, any>>(
-  filename: string,
-  predicate: (item: T) => boolean
-): boolean {
-  const data = readJson<T>(filename);
+function deleteOne(filename, predicate) {
+  const data = readJson(filename);
   const index = data.findIndex(predicate);
   if (index === -1) return false;
   data.splice(index, 1);
   writeJson(filename, data);
   return true;
 }
+
+module.exports = {
+  readJson,
+  writeJson,
+  findOne,
+  findMany,
+  insertOne,
+  updateOne,
+  deleteOne
+};

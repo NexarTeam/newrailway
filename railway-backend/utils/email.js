@@ -1,4 +1,4 @@
-import { Resend } from 'resend';
+const { Resend } = require('resend');
 
 const FROM_EMAIL = 'NexarOS <hello@nexargames.co.uk>';
 
@@ -17,16 +17,14 @@ function getResendClient() {
   };
 }
 
-export async function sendVerificationEmail(toEmail: string, username: string, verificationToken: string): Promise<boolean> {
+async function sendVerificationEmail(toEmail, username, verificationToken) {
   console.log('[Email] sendVerificationEmail called for:', toEmail);
   
   try {
     const { client, fromEmail } = getResendClient();
     console.log('[Email] Got client, fromEmail:', fromEmail);
     
-    const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] 
-      ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
-      : 'http://localhost:5000';
+    const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
     
     const verificationLink = `${baseUrl}/verify?token=${verificationToken}`;
     console.log('[Email] Verification link:', verificationLink);
@@ -69,15 +67,13 @@ export async function sendVerificationEmail(toEmail: string, username: string, v
   }
 }
 
-export async function sendPasswordResetEmail(toEmail: string, username: string, resetToken: string): Promise<boolean> {
+async function sendPasswordResetEmail(toEmail, username, resetToken) {
   console.log('[Email] sendPasswordResetEmail called for:', toEmail);
   
   try {
     const { client, fromEmail } = getResendClient();
     
-    const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] 
-      ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
-      : 'http://localhost:5000';
+    const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
     
     const resetLink = `${baseUrl}/reset-password?token=${resetToken}`;
     
@@ -115,3 +111,8 @@ export async function sendPasswordResetEmail(toEmail: string, username: string, 
     return false;
   }
 }
+
+module.exports = {
+  sendVerificationEmail,
+  sendPasswordResetEmail
+};

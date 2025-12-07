@@ -1,17 +1,15 @@
-import type { Express } from "express";
-import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import bcrypt from "bcryptjs";
-import { v4 as uuidv4 } from "uuid";
-import multer from "multer";
-import path from "path";
-import fs from "fs";
-import {
+const { createServer } = require("http");
+const { storage } = require("./storage");
+const bcrypt = require("bcryptjs");
+const { v4: uuidv4 } = require("uuid");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+const {
   generateToken,
   authMiddleware,
-  AuthenticatedRequest,
-} from "./middleware/auth";
-import {
+} = require("./middleware/auth");
+const {
   readJson,
   writeJson,
   findOne,
@@ -19,18 +17,11 @@ import {
   insertOne,
   updateOne,
   deleteOne,
-} from "./utils/fileDb";
-import { sendVerificationEmail, sendPasswordResetEmail } from "./utils/email";
-import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
+} = require("./utils/fileDb");
+const { sendVerificationEmail, sendPasswordResetEmail } = require("./utils/email");
+const { getUncachableStripeClient, getStripePublishableKey } = require("./stripeClient");
 
-// System configuration
-interface SystemConfig {
-  version: string;
-  edition: string;
-  systemId: string | null;
-}
-
-function getSystemConfig(): SystemConfig {
+function getSystemConfig() {
   const configPath = path.join(process.cwd(), "shared/config.json");
   try {
     const data = fs.readFileSync(configPath, "utf-8");
@@ -40,12 +31,12 @@ function getSystemConfig(): SystemConfig {
   }
 }
 
-function saveSystemConfig(config: SystemConfig): void {
+function saveSystemConfig(config) {
   const configPath = path.join(process.cwd(), "shared/config.json");
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 }
 
-function generateSystemId(): string {
+function generateSystemId() {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   const segment1 = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
   const segment2 = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
@@ -54,13 +45,13 @@ function generateSystemId(): string {
 
 const avatarStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(process.cwd(), "server/uploads/avatars");
+    const uploadDir = path.join(process.cwd(), "uploads/avatars");
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
     cb(null, uploadDir);
   },
-  filename: (req: AuthenticatedRequest, file, cb) => {
+  filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
     const filename = `${req.user?.userId}-${Date.now()}${ext}`;
     cb(null, filename);
@@ -80,119 +71,6 @@ const uploadAvatar = multer({
   },
 });
 
-interface ParentalControls {
-  enabled: boolean;
-  parentPin: string;
-  playtimeLimit: number | null;
-  canMakePurchases: boolean;
-  restrictedRatings: string[];
-  requiresParentApproval: boolean;
-  dailyPlaytimeLog: {
-    date: string;
-    minutesPlayed: number;
-  };
-}
-
-interface Subscription {
-  active: boolean;
-  renewalDate: string;
-  stripeCustomerId: string;
-  stripeSubscriptionId: string;
-}
-
-interface TrialUsage {
-  [gameId: string]: {
-    minutesPlayed: number;
-    expired: boolean;
-  };
-}
-
-interface DeveloperProfile {
-  studioName: string;
-  website: string;
-  description: string;
-  contactEmail: string;
-  status: "none" | "pending" | "approved" | "rejected";
-}
-
-interface User {
-  id: string;
-  email: string;
-  username: string;
-  passwordHash: string;
-  avatarUrl: string;
-  bio: string;
-  createdAt: string;
-  verified: boolean;
-  verificationToken: string;
-  walletBalance: number;
-  ownedGames: string[];
-  passwordResetToken?: string;
-  passwordResetTokenExpiry?: number;
-  parentalControls?: ParentalControls;
-  subscription?: Subscription;
-  trialUsage?: TrialUsage;
-  role: "user" | "developer" | "admin";
-  developerProfile?: DeveloperProfile;
-}
-
-interface DeveloperGame {
-  gameId: string;
-  developerId: string;
-  title: string;
-  description: string;
-  price: number;
-  genre: string;
-  tags: string[];
-  status: "draft" | "pending" | "approved" | "rejected";
-  versions: string[];
-  createdAt: string;
-  updatedAt: string;
-  coverImage?: string;
-}
-
-interface WalletTransaction {
-  id: string;
-  userId: string;
-  type: "deposit" | "purchase" | "refund";
-  amount: number;
-  description: string;
-  gameId?: string;
-  stripeSessionId?: string;
-  timestamp: string;
-}
-
-interface FriendRequest {
-  id: string;
-  senderId: string;
-  receiverId: string;
-  status: "pending" | "accepted" | "rejected";
-  createdAt: string;
-}
-
-interface Message {
-  id: string;
-  fromId: string;
-  toId: string;
-  text: string;
-  timestamp: string;
-}
-
-interface UserAchievement {
-  id: string;
-  userId: string;
-  achievementId: string;
-  unlockedAt: string;
-}
-
-interface CloudSave {
-  id: string;
-  userId: string;
-  filename: string;
-  data: string;
-  uploadedAt: string;
-}
-
 const ACHIEVEMENTS_LIST = [
   { id: "first_login", name: "First Login", description: "Log in for the first time", icon: "trophy" },
   { id: "profile_complete", name: "Profile Complete", description: "Complete your profile with avatar and bio", icon: "user" },
@@ -203,16 +81,7 @@ const ACHIEVEMENTS_LIST = [
   { id: "developer", name: "Developer", description: "Have a game approved for the Nexar Store", icon: "code" },
 ];
 
-interface GameCatalogEntry {
-  price: number;
-  name: string;
-  trialEnabled?: boolean;
-  trialDurationMinutes?: number;
-  nexarPlusDiscount?: number;
-  inNexarPlusCollection?: boolean;
-}
-
-const GAME_CATALOG: Record<string, GameCatalogEntry> = {
+const GAME_CATALOG = {
   "store-1": { price: 49.99, name: "Galactic Frontier", trialEnabled: true, trialDurationMinutes: 120, nexarPlusDiscount: 20 },
   "store-2": { price: 59.99, name: "Dragon's Legacy", trialEnabled: true, trialDurationMinutes: 120, nexarPlusDiscount: 15 },
   "store-3": { price: 29.99, name: "Urban Legends", nexarPlusDiscount: 25 },
@@ -226,14 +95,11 @@ const GAME_CATALOG: Record<string, GameCatalogEntry> = {
 const NEXAR_PLUS_PRICE = 4.99;
 const NEXAR_PLUS_CURRENCY = "gbp";
 
-export async function registerRoutes(
-  httpServer: Server,
-  app: Express
-): Promise<Server> {
+async function registerRoutes(httpServer, app) {
   
   // Serve uploaded avatars statically
   app.use("/uploads/avatars", (req, res, next) => {
-    const avatarPath = path.join(process.cwd(), "server/uploads/avatars", req.path);
+    const avatarPath = path.join(process.cwd(), "uploads/avatars", req.path);
     if (fs.existsSync(avatarPath)) {
       res.sendFile(avatarPath);
     } else {
@@ -280,19 +146,19 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Password must be at least 6 characters" });
       }
 
-      const existingEmail = findOne<User>("users.json", (u) => u.email === email);
+      const existingEmail = findOne("users.json", (u) => u.email === email);
       if (existingEmail) {
         return res.status(400).json({ message: "Email already in use" });
       }
 
-      const existingUsername = findOne<User>("users.json", (u) => u.username === username);
+      const existingUsername = findOne("users.json", (u) => u.username === username);
       if (existingUsername) {
         return res.status(400).json({ message: "Username already taken" });
       }
 
       const passwordHash = await bcrypt.hash(password, 10);
       const verificationToken = uuidv4();
-      const user: User = {
+      const user = {
         id: uuidv4(),
         email,
         username,
@@ -309,7 +175,7 @@ export async function registerRoutes(
 
       insertOne("users.json", user);
 
-      insertOne<UserAchievement>("achievements.json", {
+      insertOne("achievements.json", {
         id: uuidv4(),
         userId: user.id,
         achievementId: "first_login",
@@ -340,7 +206,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Email and password are required" });
       }
 
-      const user = findOne<User>("users.json", (u) => u.email === email);
+      const user = findOne("users.json", (u) => u.email === email);
       if (!user) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
@@ -380,7 +246,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Email is required" });
       }
 
-      const user = findOne<User>("users.json", (u) => u.email === email);
+      const user = findOne("users.json", (u) => u.email === email);
       if (!user) {
         // Don't reveal if email exists or not for security
         return res.json({ message: "If an account exists with this email, a verification link has been sent." });
@@ -393,7 +259,7 @@ export async function registerRoutes(
 
       // Generate a new verification token
       const newToken = uuidv4();
-      updateOne<User>("users.json", (u) => u.id === user.id, { verificationToken: newToken });
+      updateOne("users.json", (u) => u.id === user.id, { verificationToken: newToken });
 
       await sendVerificationEmail(email, user.username, newToken);
       
@@ -414,7 +280,7 @@ export async function registerRoutes(
       }
 
       const normalizedEmail = email.toLowerCase().trim();
-      const user = findOne<User>("users.json", (u) => u.email.toLowerCase() === normalizedEmail);
+      const user = findOne("users.json", (u) => u.email.toLowerCase() === normalizedEmail);
       
       // Always return success to prevent email enumeration
       if (!user || !user.verified) {
@@ -426,7 +292,7 @@ export async function registerRoutes(
       const resetTokenExpiry = Date.now() + 15 * 60 * 1000; // 15 minutes
 
       // Update user with reset token
-      updateOne<User>("users.json", (u) => u.id === user.id, {
+      updateOne("users.json", (u) => u.id === user.id, {
         passwordResetToken: resetToken,
         passwordResetTokenExpiry: resetTokenExpiry,
       });
@@ -456,7 +322,7 @@ export async function registerRoutes(
       }
 
       // Find user with this reset token
-      const user = findOne<User>("users.json", (u) => u.passwordResetToken === token);
+      const user = findOne("users.json", (u) => u.passwordResetToken === token);
       
       if (!user) {
         return res.status(400).json({ message: "Invalid or expired reset token" });
@@ -465,7 +331,7 @@ export async function registerRoutes(
       // Check if token is expired
       if (!user.passwordResetTokenExpiry || Date.now() > user.passwordResetTokenExpiry) {
         // Clear the expired token
-        updateOne<User>("users.json", (u) => u.id === user.id, {
+        updateOne("users.json", (u) => u.id === user.id, {
           passwordResetToken: "",
           passwordResetTokenExpiry: 0,
         });
@@ -476,7 +342,7 @@ export async function registerRoutes(
       const passwordHash = await bcrypt.hash(newPassword, 10);
 
       // Update password and clear reset token
-      updateOne<User>("users.json", (u) => u.id === user.id, {
+      updateOne("users.json", (u) => u.id === user.id, {
         passwordHash,
         passwordResetToken: "",
         passwordResetTokenExpiry: 0,
@@ -489,8 +355,8 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/auth/me", authMiddleware, (req: AuthenticatedRequest, res) => {
-    const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+  app.get("/api/auth/me", authMiddleware, (req, res) => {
+    const user = findOne("users.json", (u) => u.id === req.user.userId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -498,35 +364,35 @@ export async function registerRoutes(
     res.json(userWithoutPassword);
   });
 
-  app.patch("/api/auth/profile", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  app.patch("/api/auth/profile", authMiddleware, async (req, res) => {
     try {
       const { avatarUrl, bio, username } = req.body;
-      const updates: Partial<User> = {};
+      const updates = {};
 
       if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
       if (bio !== undefined) updates.bio = bio;
       if (username !== undefined) {
-        const existing = findOne<User>("users.json", (u) => u.username === username && u.id !== req.user!.userId);
+        const existing = findOne("users.json", (u) => u.username === username && u.id !== req.user.userId);
         if (existing) {
           return res.status(400).json({ message: "Username already taken" });
         }
         updates.username = username;
       }
 
-      const updated = updateOne<User>("users.json", (u) => u.id === req.user!.userId, updates);
+      const updated = updateOne("users.json", (u) => u.id === req.user.userId, updates);
       if (!updated) {
         return res.status(404).json({ message: "User not found" });
       }
 
-      const unlockedAchievements: typeof ACHIEVEMENTS_LIST = [];
+      const unlockedAchievements = [];
       if (updated.avatarUrl && updated.bio) {
-        const existing = findOne<UserAchievement>("achievements.json", 
-          (a) => a.userId === req.user!.userId && a.achievementId === "profile_complete"
+        const existing = findOne("achievements.json", 
+          (a) => a.userId === req.user.userId && a.achievementId === "profile_complete"
         );
         if (!existing) {
-          insertOne<UserAchievement>("achievements.json", {
+          insertOne("achievements.json", {
             id: uuidv4(),
-            userId: req.user!.userId,
+            userId: req.user.userId,
             achievementId: "profile_complete",
             unlockedAt: new Date().toISOString(),
           });
@@ -543,7 +409,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/auth/avatar", authMiddleware, uploadAvatar.single("avatar"), async (req: AuthenticatedRequest, res) => {
+  app.post("/api/auth/avatar", authMiddleware, uploadAvatar.single("avatar"), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -551,20 +417,20 @@ export async function registerRoutes(
 
       const avatarUrl = `/uploads/avatars/${req.file.filename}`;
       
-      const updated = updateOne<User>("users.json", (u) => u.id === req.user!.userId, { avatarUrl });
+      const updated = updateOne("users.json", (u) => u.id === req.user.userId, { avatarUrl });
       if (!updated) {
         return res.status(404).json({ message: "User not found" });
       }
 
-      const unlockedAchievements: typeof ACHIEVEMENTS_LIST = [];
+      const unlockedAchievements = [];
       if (updated.avatarUrl && updated.bio) {
-        const existing = findOne<UserAchievement>("achievements.json", 
-          (a) => a.userId === req.user!.userId && a.achievementId === "profile_complete"
+        const existing = findOne("achievements.json", 
+          (a) => a.userId === req.user.userId && a.achievementId === "profile_complete"
         );
         if (!existing) {
-          insertOne<UserAchievement>("achievements.json", {
+          insertOne("achievements.json", {
             id: uuidv4(),
-            userId: req.user!.userId,
+            userId: req.user.userId,
             achievementId: "profile_complete",
             unlockedAt: new Date().toISOString(),
           });
@@ -583,9 +449,9 @@ export async function registerRoutes(
 
   // ==================== FRIENDS ROUTES ====================
 
-  app.get("/api/friends", authMiddleware, (req: AuthenticatedRequest, res) => {
-    const userId = req.user!.userId;
-    const friendRequests = findMany<FriendRequest>("friends.json", 
+  app.get("/api/friends", authMiddleware, (req, res) => {
+    const userId = req.user.userId;
+    const friendRequests = findMany("friends.json", 
       (fr) => fr.status === "accepted" && (fr.senderId === userId || fr.receiverId === userId)
     );
 
@@ -594,7 +460,7 @@ export async function registerRoutes(
     );
 
     const friends = friendIds.map((id) => {
-      const user = findOne<User>("users.json", (u) => u.id === id);
+      const user = findOne("users.json", (u) => u.id === id);
       if (!user) return null;
       const { passwordHash: _, ...userWithoutPassword } = user;
       return userWithoutPassword;
@@ -603,14 +469,14 @@ export async function registerRoutes(
     res.json(friends);
   });
 
-  app.get("/api/friends/requests", authMiddleware, (req: AuthenticatedRequest, res) => {
-    const userId = req.user!.userId;
-    const pending = findMany<FriendRequest>("friends.json",
+  app.get("/api/friends/requests", authMiddleware, (req, res) => {
+    const userId = req.user.userId;
+    const pending = findMany("friends.json",
       (fr) => fr.receiverId === userId && fr.status === "pending"
     );
 
     const requestsWithUsers = pending.map((fr) => {
-      const sender = findOne<User>("users.json", (u) => u.id === fr.senderId);
+      const sender = findOne("users.json", (u) => u.id === fr.senderId);
       if (!sender) return null;
       const { passwordHash: _, ...senderWithoutPassword } = sender;
       return { ...fr, sender: senderWithoutPassword };
@@ -619,14 +485,14 @@ export async function registerRoutes(
     res.json(requestsWithUsers);
   });
 
-  app.get("/api/friends/sent", authMiddleware, (req: AuthenticatedRequest, res) => {
-    const userId = req.user!.userId;
-    const sent = findMany<FriendRequest>("friends.json",
+  app.get("/api/friends/sent", authMiddleware, (req, res) => {
+    const userId = req.user.userId;
+    const sent = findMany("friends.json",
       (fr) => fr.senderId === userId && fr.status === "pending"
     );
 
     const requestsWithUsers = sent.map((fr) => {
-      const receiver = findOne<User>("users.json", (u) => u.id === fr.receiverId);
+      const receiver = findOne("users.json", (u) => u.id === fr.receiverId);
       if (!receiver) return null;
       const { passwordHash: _, ...receiverWithoutPassword } = receiver;
       return { ...fr, receiver: receiverWithoutPassword };
@@ -635,15 +501,15 @@ export async function registerRoutes(
     res.json(requestsWithUsers);
   });
 
-  app.post("/api/friends/request", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.post("/api/friends/request", authMiddleware, (req, res) => {
     const { username } = req.body;
-    const userId = req.user!.userId;
+    const userId = req.user.userId;
 
     if (!username) {
       return res.status(400).json({ message: "Username is required" });
     }
 
-    const targetUser = findOne<User>("users.json", (u) => u.username === username);
+    const targetUser = findOne("users.json", (u) => u.username === username);
     if (!targetUser) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -652,7 +518,7 @@ export async function registerRoutes(
       return res.status(400).json({ message: "Cannot send friend request to yourself" });
     }
 
-    const existingRequest = findOne<FriendRequest>("friends.json", (fr) =>
+    const existingRequest = findOne("friends.json", (fr) =>
       (fr.senderId === userId && fr.receiverId === targetUser.id) ||
       (fr.senderId === targetUser.id && fr.receiverId === userId)
     );
@@ -664,7 +530,7 @@ export async function registerRoutes(
       return res.status(400).json({ message: "Friend request already exists" });
     }
 
-    const friendRequest: FriendRequest = {
+    const friendRequest = {
       id: uuidv4(),
       senderId: userId,
       receiverId: targetUser.id,
@@ -676,205 +542,146 @@ export async function registerRoutes(
     res.status(201).json({ message: "Friend request sent" });
   });
 
-  app.post("/api/friends/accept/:requestId", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.post("/api/friends/accept/:requestId", authMiddleware, (req, res) => {
     const { requestId } = req.params;
-    const userId = req.user!.userId;
+    const userId = req.user.userId;
 
-    const friendRequest = findOne<FriendRequest>("friends.json", (fr) => fr.id === requestId);
-    if (!friendRequest) {
+    const request = findOne("friends.json", (fr) => fr.id === requestId && fr.receiverId === userId);
+    if (!request) {
       return res.status(404).json({ message: "Friend request not found" });
     }
 
-    if (friendRequest.receiverId !== userId) {
-      return res.status(403).json({ message: "Not authorized" });
-    }
-
-    if (friendRequest.status !== "pending") {
+    if (request.status !== "pending") {
       return res.status(400).json({ message: "Request already processed" });
     }
 
-    updateOne<FriendRequest>("friends.json", (fr) => fr.id === requestId, { status: "accepted" });
+    updateOne("friends.json", (fr) => fr.id === requestId, { status: "accepted" });
 
-    const unlockedAchievements: typeof ACHIEVEMENTS_LIST = [];
-    
-    [userId, friendRequest.senderId].forEach((uid) => {
-      const friendCount = findMany<FriendRequest>("friends.json",
-        (fr) => fr.status === "accepted" && (fr.senderId === uid || fr.receiverId === uid)
-      ).length;
+    // Check for first friend achievement
+    const userFriendships = findMany("friends.json", 
+      (fr) => fr.status === "accepted" && (fr.senderId === userId || fr.receiverId === userId)
+    );
 
-      if (friendCount === 1) {
-        const existing = findOne<UserAchievement>("achievements.json",
-          (a) => a.userId === uid && a.achievementId === "first_friend"
-        );
-        if (!existing) {
-          insertOne<UserAchievement>("achievements.json", {
-            id: uuidv4(),
-            userId: uid,
-            achievementId: "first_friend",
-            unlockedAt: new Date().toISOString(),
-          });
-          if (uid === userId) {
-            const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "first_friend");
-            if (achievement) unlockedAchievements.push(achievement);
-          }
-        }
+    const unlockedAchievements = [];
+    if (userFriendships.length === 1) {
+      const existingAchievement = findOne("achievements.json", 
+        (a) => a.userId === userId && a.achievementId === "first_friend"
+      );
+      if (!existingAchievement) {
+        insertOne("achievements.json", {
+          id: uuidv4(),
+          userId,
+          achievementId: "first_friend",
+          unlockedAt: new Date().toISOString(),
+        });
+        const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "first_friend");
+        if (achievement) unlockedAchievements.push(achievement);
       }
+    }
 
-      if (friendCount >= 5) {
-        const existing = findOne<UserAchievement>("achievements.json",
-          (a) => a.userId === uid && a.achievementId === "social_butterfly"
-        );
-        if (!existing) {
-          insertOne<UserAchievement>("achievements.json", {
-            id: uuidv4(),
-            userId: uid,
-            achievementId: "social_butterfly",
-            unlockedAt: new Date().toISOString(),
-          });
-          if (uid === userId) {
-            const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "social_butterfly");
-            if (achievement) unlockedAchievements.push(achievement);
-          }
-        }
+    if (userFriendships.length >= 5) {
+      const existingAchievement = findOne("achievements.json", 
+        (a) => a.userId === userId && a.achievementId === "social_butterfly"
+      );
+      if (!existingAchievement) {
+        insertOne("achievements.json", {
+          id: uuidv4(),
+          userId,
+          achievementId: "social_butterfly",
+          unlockedAt: new Date().toISOString(),
+        });
+        const achievement = ACHIEVEMENTS_LIST.find(a => a.id === "social_butterfly");
+        if (achievement) unlockedAchievements.push(achievement);
       }
-    });
+    }
 
     res.json({ message: "Friend request accepted", unlockedAchievements });
   });
 
-  app.post("/api/friends/reject/:requestId", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.post("/api/friends/reject/:requestId", authMiddleware, (req, res) => {
     const { requestId } = req.params;
-    const userId = req.user!.userId;
+    const userId = req.user.userId;
 
-    const friendRequest = findOne<FriendRequest>("friends.json", (fr) => fr.id === requestId);
-    if (!friendRequest) {
+    const request = findOne("friends.json", (fr) => fr.id === requestId && fr.receiverId === userId);
+    if (!request) {
       return res.status(404).json({ message: "Friend request not found" });
     }
 
-    if (friendRequest.receiverId !== userId) {
-      return res.status(403).json({ message: "Not authorized" });
-    }
-
-    updateOne<FriendRequest>("friends.json", (fr) => fr.id === requestId, { status: "rejected" });
+    updateOne("friends.json", (fr) => fr.id === requestId, { status: "rejected" });
     res.json({ message: "Friend request rejected" });
   });
 
-  app.delete("/api/friends/:friendId", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.delete("/api/friends/:friendId", authMiddleware, (req, res) => {
     const { friendId } = req.params;
-    const userId = req.user!.userId;
+    const userId = req.user.userId;
 
-    const deleted = deleteOne<FriendRequest>("friends.json", (fr) =>
+    const deleted = deleteOne("friends.json", (fr) =>
       fr.status === "accepted" &&
       ((fr.senderId === userId && fr.receiverId === friendId) ||
        (fr.senderId === friendId && fr.receiverId === userId))
     );
 
     if (!deleted) {
-      return res.status(404).json({ message: "Friend not found" });
+      return res.status(404).json({ message: "Friendship not found" });
     }
 
     res.json({ message: "Friend removed" });
   });
 
-  app.get("/api/users/search", authMiddleware, (req: AuthenticatedRequest, res) => {
-    const { q } = req.query;
-    if (!q || typeof q !== "string") {
-      return res.status(400).json({ message: "Search query required" });
-    }
-
-    const users = findMany<User>("users.json", (u) =>
-      u.username.toLowerCase().includes(q.toLowerCase()) && u.id !== req.user!.userId
-    );
-
-    const results = users.map((u) => {
-      const { passwordHash: _, ...userWithoutPassword } = u;
-      return userWithoutPassword;
-    });
-
-    res.json(results);
-  });
-
   // ==================== MESSAGES ROUTES ====================
 
-  app.get("/api/messages/conversations", authMiddleware, (req: AuthenticatedRequest, res) => {
-    const userId = req.user!.userId;
-    const messages = readJson<Message>("messages.json");
+  app.get("/api/messages/:friendId", authMiddleware, (req, res) => {
+    const { friendId } = req.params;
+    const userId = req.user.userId;
 
-    const conversationPartners = new Set<string>();
-    messages.forEach((msg) => {
-      if (msg.fromId === userId) conversationPartners.add(msg.toId);
-      if (msg.toId === userId) conversationPartners.add(msg.fromId);
-    });
-
-    const conversations = Array.from(conversationPartners).map((partnerId) => {
-      const partner = findOne<User>("users.json", (u) => u.id === partnerId);
-      if (!partner) return null;
-
-      const partnerMessages = messages.filter(
-        (m) => (m.fromId === userId && m.toId === partnerId) || (m.fromId === partnerId && m.toId === userId)
-      );
-      const lastMessage = partnerMessages.sort(
-        (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      )[0];
-
-      const { passwordHash: _, ...partnerWithoutPassword } = partner;
-      return {
-        partner: partnerWithoutPassword,
-        lastMessage,
-        unreadCount: 0,
-      };
-    }).filter(Boolean);
-
-    conversations.sort((a: any, b: any) => 
-      new Date(b.lastMessage?.timestamp || 0).getTime() - new Date(a.lastMessage?.timestamp || 0).getTime()
-    );
-
-    res.json(conversations);
-  });
-
-  app.get("/api/messages/:partnerId", authMiddleware, (req: AuthenticatedRequest, res) => {
-    const userId = req.user!.userId;
-    const { partnerId } = req.params;
-
-    const messages = findMany<Message>("messages.json", (m) =>
-      (m.fromId === userId && m.toId === partnerId) || (m.fromId === partnerId && m.toId === userId)
+    const messages = findMany("messages.json", (m) =>
+      (m.fromId === userId && m.toId === friendId) ||
+      (m.fromId === friendId && m.toId === userId)
     );
 
     messages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     res.json(messages);
   });
 
-  app.post("/api/messages", authMiddleware, (req: AuthenticatedRequest, res) => {
-    const userId = req.user!.userId;
-    const { toId, text } = req.body;
+  app.post("/api/messages/:friendId", authMiddleware, (req, res) => {
+    const { friendId } = req.params;
+    const { text } = req.body;
+    const userId = req.user.userId;
 
-    if (!toId || !text) {
-      return res.status(400).json({ message: "Recipient and message text required" });
+    if (!text || !text.trim()) {
+      return res.status(400).json({ message: "Message text is required" });
     }
 
-    const recipient = findOne<User>("users.json", (u) => u.id === toId);
-    if (!recipient) {
-      return res.status(404).json({ message: "Recipient not found" });
+    const friendship = findOne("friends.json", (fr) =>
+      fr.status === "accepted" &&
+      ((fr.senderId === userId && fr.receiverId === friendId) ||
+       (fr.senderId === friendId && fr.receiverId === userId))
+    );
+
+    if (!friendship) {
+      return res.status(403).json({ message: "You can only message friends" });
     }
 
-    const message: Message = {
+    const message = {
       id: uuidv4(),
       fromId: userId,
-      toId,
-      text,
+      toId: friendId,
+      text: text.trim(),
       timestamp: new Date().toISOString(),
     };
 
     insertOne("messages.json", message);
 
-    const unlockedAchievements: typeof ACHIEVEMENTS_LIST = [];
-    const userMessages = findMany<Message>("messages.json", (m) => m.fromId === userId);
+    // Check for messaging achievements
+    const unlockedAchievements = [];
+    const userMessages = findMany("messages.json", (m) => m.fromId === userId);
+
     if (userMessages.length === 1) {
-      const existing = findOne<UserAchievement>("achievements.json",
+      const existingAchievement = findOne("achievements.json", 
         (a) => a.userId === userId && a.achievementId === "messenger"
       );
-      if (!existing) {
-        insertOne<UserAchievement>("achievements.json", {
+      if (!existingAchievement) {
+        insertOne("achievements.json", {
           id: uuidv4(),
           userId,
           achievementId: "messenger",
@@ -886,11 +693,11 @@ export async function registerRoutes(
     }
 
     if (userMessages.length >= 50) {
-      const existing = findOne<UserAchievement>("achievements.json",
+      const existingAchievement = findOne("achievements.json", 
         (a) => a.userId === userId && a.achievementId === "chat_master"
       );
-      if (!existing) {
-        insertOne<UserAchievement>("achievements.json", {
+      if (!existingAchievement) {
+        insertOne("achievements.json", {
           id: uuidv4(),
           userId,
           achievementId: "chat_master",
@@ -906,12 +713,12 @@ export async function registerRoutes(
 
   // ==================== ACHIEVEMENTS ROUTES ====================
 
-  app.get("/api/achievements", authMiddleware, (req: AuthenticatedRequest, res) => {
-    const userId = req.user!.userId;
-    const userAchievements = findMany<UserAchievement>("achievements.json", (a) => a.userId === userId);
+  app.get("/api/achievements", authMiddleware, (req, res) => {
+    const userId = req.user.userId;
+    const userAchievements = findMany("achievements.json", (a) => a.userId === userId);
 
-    const achievementsWithDetails = ACHIEVEMENTS_LIST.map((achievement) => {
-      const unlocked = userAchievements.find((ua) => ua.achievementId === achievement.id);
+    const achievementsWithDetails = ACHIEVEMENTS_LIST.map(achievement => {
+      const unlocked = userAchievements.find(ua => ua.achievementId === achievement.id);
       return {
         ...achievement,
         unlocked: !!unlocked,
@@ -922,22 +729,25 @@ export async function registerRoutes(
     res.json(achievementsWithDetails);
   });
 
+  app.get("/api/achievements/list", (req, res) => {
+    res.json(ACHIEVEMENTS_LIST);
+  });
+
   // ==================== CLOUD SAVES ROUTES ====================
 
-  app.get("/api/cloud", authMiddleware, (req: AuthenticatedRequest, res) => {
-    const userId = req.user!.userId;
-    const saves = findMany<CloudSave>("cloud_saves.json", (s) => s.userId === userId);
-    saves.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+  app.get("/api/cloud", authMiddleware, (req, res) => {
+    const userId = req.user.userId;
+    const saves = findMany("cloud_saves.json", (s) => s.userId === userId);
     
     const savesWithoutData = saves.map(({ data, ...save }) => save);
     res.json(savesWithoutData);
   });
 
-  app.get("/api/cloud/:saveId", authMiddleware, (req: AuthenticatedRequest, res) => {
-    const userId = req.user!.userId;
+  app.get("/api/cloud/:saveId", authMiddleware, (req, res) => {
+    const userId = req.user.userId;
     const { saveId } = req.params;
 
-    const save = findOne<CloudSave>("cloud_saves.json", (s) => s.id === saveId && s.userId === userId);
+    const save = findOne("cloud_saves.json", (s) => s.id === saveId && s.userId === userId);
     if (!save) {
       return res.status(404).json({ message: "Cloud save not found" });
     }
@@ -945,15 +755,15 @@ export async function registerRoutes(
     res.json(save);
   });
 
-  app.post("/api/cloud", authMiddleware, (req: AuthenticatedRequest, res) => {
-    const userId = req.user!.userId;
+  app.post("/api/cloud", authMiddleware, (req, res) => {
+    const userId = req.user.userId;
     const { filename, data } = req.body;
 
     if (!filename || !data) {
       return res.status(400).json({ message: "Filename and data are required" });
     }
 
-    const cloudSave: CloudSave = {
+    const save = {
       id: uuidv4(),
       userId,
       filename,
@@ -961,27 +771,27 @@ export async function registerRoutes(
       uploadedAt: new Date().toISOString(),
     };
 
-    insertOne("cloud_saves.json", cloudSave);
+    insertOne("cloud_saves.json", save);
 
-    const { data: _, ...saveWithoutData } = cloudSave;
+    const { data: _, ...saveWithoutData } = save;
     res.status(201).json(saveWithoutData);
   });
 
-  app.patch("/api/cloud/:saveId", authMiddleware, (req: AuthenticatedRequest, res) => {
-    const userId = req.user!.userId;
+  app.patch("/api/cloud/:saveId", authMiddleware, (req, res) => {
+    const userId = req.user.userId;
     const { saveId } = req.params;
     const { filename, data } = req.body;
 
-    const existing = findOne<CloudSave>("cloud_saves.json", (s) => s.id === saveId && s.userId === userId);
+    const existing = findOne("cloud_saves.json", (s) => s.id === saveId && s.userId === userId);
     if (!existing) {
       return res.status(404).json({ message: "Cloud save not found" });
     }
 
-    const updates: Partial<CloudSave> = { uploadedAt: new Date().toISOString() };
+    const updates = { uploadedAt: new Date().toISOString() };
     if (filename) updates.filename = filename;
     if (data) updates.data = data;
 
-    const updated = updateOne<CloudSave>("cloud_saves.json", (s) => s.id === saveId, updates);
+    const updated = updateOne("cloud_saves.json", (s) => s.id === saveId, updates);
     if (!updated) {
       return res.status(500).json({ message: "Update failed" });
     }
@@ -990,11 +800,11 @@ export async function registerRoutes(
     res.json(saveWithoutData);
   });
 
-  app.delete("/api/cloud/:saveId", authMiddleware, (req: AuthenticatedRequest, res) => {
-    const userId = req.user!.userId;
+  app.delete("/api/cloud/:saveId", authMiddleware, (req, res) => {
+    const userId = req.user.userId;
     const { saveId } = req.params;
 
-    const deleted = deleteOne<CloudSave>("cloud_saves.json", (s) => s.id === saveId && s.userId === userId);
+    const deleted = deleteOne("cloud_saves.json", (s) => s.id === saveId && s.userId === userId);
     if (!deleted) {
       return res.status(404).json({ message: "Cloud save not found" });
     }
@@ -1012,7 +822,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Verification token is required" });
       }
 
-      const user = findOne<User>("users.json", (u) => u.verificationToken === token);
+      const user = findOne("users.json", (u) => u.verificationToken === token);
       if (!user) {
         return res.status(400).json({ message: "Invalid verification token" });
       }
@@ -1021,7 +831,7 @@ export async function registerRoutes(
         return res.json({ message: "Email already verified" });
       }
 
-      updateOne<User>("users.json", (u) => u.id === user.id, { verified: true, verificationToken: undefined });
+      updateOne("users.json", (u) => u.id === user.id, { verified: true, verificationToken: undefined });
       res.json({ message: "Email verified successfully" });
     } catch (error) {
       console.error("Verification error:", error);
@@ -1029,41 +839,15 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/auth/resend-verification", authMiddleware, async (req: AuthenticatedRequest, res) => {
-    try {
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      if (user.verified) {
-        return res.status(400).json({ message: "Email already verified" });
-      }
-
-      const newToken = uuidv4();
-      updateOne<User>("users.json", (u) => u.id === user.id, { verificationToken: newToken });
-
-      const sent = await sendVerificationEmail(user.email, user.username, newToken);
-      if (!sent) {
-        return res.status(500).json({ message: "Failed to send verification email" });
-      }
-
-      res.json({ message: "Verification email sent" });
-    } catch (error) {
-      console.error("Resend verification error:", error);
-      res.status(500).json({ message: "Failed to send verification email" });
-    }
-  });
-
   // ==================== WALLET ROUTES ====================
 
-  app.get("/api/wallet", authMiddleware, (req: AuthenticatedRequest, res) => {
-    const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+  app.get("/api/wallet", authMiddleware, (req, res) => {
+    const user = findOne("users.json", (u) => u.id === req.user.userId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const transactions = findMany<WalletTransaction>("wallet_transactions.json", (t) => t.userId === req.user!.userId);
+    const transactions = findMany("wallet_transactions.json", (t) => t.userId === req.user.userId);
     transactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     res.json({
@@ -1083,7 +867,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/wallet/create-checkout", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/wallet/create-checkout", authMiddleware, async (req, res) => {
     try {
       const { amount } = req.body;
       
@@ -1091,16 +875,18 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Amount must be between £5 and £100" });
       }
 
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
 
       const stripe = await getUncachableStripeClient();
       
-      const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] 
-        ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
-        : 'http://localhost:5000';
+      const baseUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
+        ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+        : process.env.REPLIT_DOMAINS?.split(',')[0] 
+          ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+          : 'http://localhost:5000';
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
@@ -1132,7 +918,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/wallet/verify-payment", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/wallet/verify-payment", authMiddleware, async (req, res) => {
     try {
       const { sessionId } = req.body;
       
@@ -1140,7 +926,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Session ID is required" });
       }
 
-      const existingTransaction = findOne<WalletTransaction>("wallet_transactions.json", 
+      const existingTransaction = findOne("wallet_transactions.json", 
         (t) => t.stripeSessionId === sessionId
       );
       if (existingTransaction) {
@@ -1154,7 +940,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Payment not completed" });
       }
 
-      if (session.metadata?.userId !== req.user!.userId) {
+      if (session.metadata?.userId !== req.user.userId) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
@@ -1163,15 +949,15 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid amount" });
       }
 
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
 
       const newBalance = (user.walletBalance || 0) + amount;
-      updateOne<User>("users.json", (u) => u.id === user.id, { walletBalance: newBalance });
+      updateOne("users.json", (u) => u.id === user.id, { walletBalance: newBalance });
 
-      const transaction: WalletTransaction = {
+      const transaction = {
         id: uuidv4(),
         userId: user.id,
         type: "deposit",
@@ -1189,7 +975,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/wallet/purchase-game", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/wallet/purchase-game", authMiddleware, async (req, res) => {
     try {
       const { gameId } = req.body;
       
@@ -1204,7 +990,7 @@ export async function registerRoutes(
 
       const gameName = gameData.name;
 
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -1230,13 +1016,13 @@ export async function registerRoutes(
       const newBalance = (user.walletBalance || 0) - finalPrice;
       const newOwnedGames = [...(user.ownedGames || []), gameId];
       
-      updateOne<User>("users.json", (u) => u.id === user.id, { 
+      updateOne("users.json", (u) => u.id === user.id, { 
         walletBalance: newBalance,
         ownedGames: newOwnedGames,
       });
 
       const discountText = discountApplied > 0 ? ` (${discountApplied}% Nexar+ discount)` : "";
-      const transaction: WalletTransaction = {
+      const transaction = {
         id: uuidv4(),
         userId: user.id,
         type: "purchase",
@@ -1263,7 +1049,7 @@ export async function registerRoutes(
 
   // ==================== PARENTAL CONTROLS ROUTES ====================
 
-  const getDefaultParentalControls = (): ParentalControls => ({
+  const getDefaultParentalControls = () => ({
     enabled: false,
     parentPin: "",
     playtimeLimit: null,
@@ -1276,7 +1062,7 @@ export async function registerRoutes(
     },
   });
 
-  app.post("/api/parental/enable", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/parental/enable", authMiddleware, async (req, res) => {
     try {
       const { pin } = req.body;
 
@@ -1284,19 +1070,19 @@ export async function registerRoutes(
         return res.status(400).json({ message: "PIN must be 4-8 digits" });
       }
 
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
 
       const hashedPin = await bcrypt.hash(pin, 10);
-      const parentalControls: ParentalControls = {
+      const parentalControls = {
         ...getDefaultParentalControls(),
         enabled: true,
         parentPin: hashedPin,
       };
 
-      updateOne<User>("users.json", (u) => u.id === user.id, { parentalControls });
+      updateOne("users.json", (u) => u.id === user.id, { parentalControls });
       res.json({ message: "Parental controls enabled" });
     } catch (error) {
       console.error("Enable parental controls error:", error);
@@ -1304,7 +1090,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/parental/disable", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/parental/disable", authMiddleware, async (req, res) => {
     try {
       const { pin } = req.body;
 
@@ -1312,7 +1098,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "PIN is required" });
       }
 
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user || !user.parentalControls?.enabled) {
         return res.status(400).json({ message: "Parental controls not enabled" });
       }
@@ -1322,7 +1108,7 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid PIN" });
       }
 
-      updateOne<User>("users.json", (u) => u.id === user.id, { 
+      updateOne("users.json", (u) => u.id === user.id, { 
         parentalControls: getDefaultParentalControls() 
       });
       res.json({ message: "Parental controls disabled" });
@@ -1332,7 +1118,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/parental/verifyPin", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/parental/verifyPin", authMiddleware, async (req, res) => {
     try {
       const { pin } = req.body;
 
@@ -1340,7 +1126,7 @@ export async function registerRoutes(
         return res.status(400).json({ valid: false });
       }
 
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user || !user.parentalControls?.enabled) {
         return res.status(400).json({ valid: false });
       }
@@ -1355,7 +1141,7 @@ export async function registerRoutes(
 
   const VALID_CONTENT_RATINGS = ["E", "T", "M", "18+"];
   
-  const LEGACY_RATING_MAP: Record<string, string> = {
+  const LEGACY_RATING_MAP = {
     "Mature": "M",
     "Teen": "T",
     "Everyone": "E",
@@ -1364,12 +1150,12 @@ export async function registerRoutes(
     "16+": "M",
   };
 
-  const normalizeRatings = (ratings: string[]): string[] => {
+  const normalizeRatings = (ratings) => {
     const normalized = ratings.map(r => LEGACY_RATING_MAP[r] || r);
     return [...new Set(normalized.filter(r => VALID_CONTENT_RATINGS.includes(r)))];
   };
 
-  app.post("/api/parental/updateSettings", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/parental/updateSettings", authMiddleware, async (req, res) => {
     try {
       const { pin, playtimeLimit, canMakePurchases, restrictedRatings, requiresParentApproval } = req.body;
 
@@ -1377,7 +1163,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "PIN is required" });
       }
 
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user || !user.parentalControls?.enabled) {
         return res.status(400).json({ message: "Parental controls not enabled" });
       }
@@ -1387,7 +1173,7 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid PIN" });
       }
 
-      const updates: Partial<ParentalControls> = {};
+      const updates = {};
       if (playtimeLimit !== undefined) updates.playtimeLimit = playtimeLimit;
       if (canMakePurchases !== undefined) updates.canMakePurchases = canMakePurchases;
       if (restrictedRatings !== undefined) {
@@ -1396,7 +1182,7 @@ export async function registerRoutes(
       if (requiresParentApproval !== undefined) updates.requiresParentApproval = requiresParentApproval;
 
       const newParentalControls = { ...user.parentalControls, ...updates };
-      updateOne<User>("users.json", (u) => u.id === user.id, { parentalControls: newParentalControls });
+      updateOne("users.json", (u) => u.id === user.id, { parentalControls: newParentalControls });
       
       res.json({ message: "Settings updated", parentalControls: newParentalControls });
     } catch (error) {
@@ -1405,9 +1191,9 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/parental/status", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.get("/api/parental/status", authMiddleware, (req, res) => {
     try {
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -1429,13 +1215,13 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/parental/checkAccess", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.post("/api/parental/checkAccess", authMiddleware, (req, res) => {
     try {
       const { gameId, rating, gameRating } = req.body;
       const rawRating = gameRating || rating;
       const contentRating = rawRating ? (LEGACY_RATING_MAP[rawRating] || rawRating) : null;
 
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -1471,7 +1257,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/parental/override", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/parental/override", authMiddleware, async (req, res) => {
     try {
       const { pin } = req.body;
 
@@ -1479,7 +1265,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "PIN is required" });
       }
 
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user || !user.parentalControls?.enabled) {
         return res.status(400).json({ message: "Parental controls not enabled" });
       }
@@ -1496,7 +1282,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/parental/logPlaytime", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.post("/api/parental/logPlaytime", authMiddleware, (req, res) => {
     try {
       const { minutes } = req.body;
 
@@ -1504,7 +1290,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid minutes" });
       }
 
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -1517,7 +1303,7 @@ export async function registerRoutes(
       }
 
       parentalControls.dailyPlaytimeLog.minutesPlayed += minutes;
-      updateOne<User>("users.json", (u) => u.id === user.id, { parentalControls });
+      updateOne("users.json", (u) => u.id === user.id, { parentalControls });
 
       res.json({ 
         minutesPlayed: parentalControls.dailyPlaytimeLog.minutesPlayed,
@@ -1529,9 +1315,9 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/parental/checkPurchase", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.post("/api/parental/checkPurchase", authMiddleware, (req, res) => {
     try {
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -1559,8 +1345,8 @@ export async function registerRoutes(
   // ==================== NEXAR+ SUBSCRIPTION ROUTES ====================
 
   // Get subscription status
-  app.get("/api/subscription/status", authMiddleware, (req: AuthenticatedRequest, res) => {
-    const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+  app.get("/api/subscription/status", authMiddleware, (req, res) => {
+    const user = findOne("users.json", (u) => u.id === req.user.userId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -1573,9 +1359,9 @@ export async function registerRoutes(
   });
 
   // Create Stripe subscription checkout session
-  app.post("/api/subscription/create-checkout", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/subscription/create-checkout", authMiddleware, async (req, res) => {
     try {
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -1586,9 +1372,11 @@ export async function registerRoutes(
 
       const stripe = await getUncachableStripeClient();
       
-      const baseUrl = process.env.REPLIT_DOMAINS?.split(',')[0] 
-        ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
-        : 'http://localhost:5000';
+      const baseUrl = process.env.RAILWAY_PUBLIC_DOMAIN 
+        ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+        : process.env.REPLIT_DOMAINS?.split(',')[0] 
+          ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+          : 'http://localhost:5000';
 
       // Create or get Stripe customer
       let customerId = user.subscription?.stripeCustomerId;
@@ -1608,12 +1396,10 @@ export async function registerRoutes(
             currency: NEXAR_PLUS_CURRENCY,
             product_data: {
               name: 'Nexar+ Subscription',
-              description: 'Monthly subscription: Game trials, discounts, exclusive content & free games',
+              description: 'Monthly subscription with exclusive benefits',
             },
             unit_amount: Math.round(NEXAR_PLUS_PRICE * 100),
-            recurring: {
-              interval: 'month',
-            },
+            recurring: { interval: 'month' },
           },
           quantity: 1,
         }],
@@ -1634,7 +1420,7 @@ export async function registerRoutes(
   });
 
   // Verify subscription after checkout
-  app.post("/api/subscription/verify", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/subscription/verify", authMiddleware, async (req, res) => {
     try {
       const { sessionId } = req.body;
       
@@ -1643,31 +1429,27 @@ export async function registerRoutes(
       }
 
       const stripe = await getUncachableStripeClient();
-      const session = await stripe.checkout.sessions.retrieve(sessionId, {
-        expand: ['subscription'],
-      });
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
 
-      if (session.metadata?.userId !== req.user!.userId) {
+      if (session.metadata?.userId !== req.user.userId) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
-      if (session.payment_status !== 'paid') {
+      if (session.status !== 'complete') {
         return res.status(400).json({ message: "Payment not completed" });
       }
 
-      const subscription = session.subscription as any;
-      if (!subscription) {
-        return res.status(400).json({ message: "Subscription not found" });
-      }
+      const subscriptionId = session.subscription;
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
       const renewalDate = new Date(subscription.current_period_end * 1000).toISOString();
 
-      updateOne<User>("users.json", (u) => u.id === req.user!.userId, {
+      updateOne("users.json", (u) => u.id === req.user.userId, {
         subscription: {
           active: true,
           renewalDate,
-          stripeCustomerId: session.customer as string,
-          stripeSubscriptionId: subscription.id,
+          stripeCustomerId: session.customer,
+          stripeSubscriptionId: subscriptionId,
         },
       });
 
@@ -1685,9 +1467,9 @@ export async function registerRoutes(
   });
 
   // Cancel subscription
-  app.post("/api/subscription/cancel", authMiddleware, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/subscription/cancel", authMiddleware, async (req, res) => {
     try {
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -1699,7 +1481,7 @@ export async function registerRoutes(
       const stripe = await getUncachableStripeClient();
       await stripe.subscriptions.cancel(user.subscription.stripeSubscriptionId);
 
-      updateOne<User>("users.json", (u) => u.id === req.user!.userId, {
+      updateOne("users.json", (u) => u.id === req.user.userId, {
         subscription: {
           ...user.subscription,
           active: false,
@@ -1721,7 +1503,7 @@ export async function registerRoutes(
   });
 
   // Check trial access
-  app.post("/api/games/trial/check", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.post("/api/games/trial/check", authMiddleware, (req, res) => {
     try {
       const { gameId } = req.body;
       
@@ -1738,7 +1520,7 @@ export async function registerRoutes(
         return res.json({ allowed: false, reason: "Trial not available for this game" });
       }
 
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -1769,7 +1551,7 @@ export async function registerRoutes(
   });
 
   // Update trial usage
-  app.post("/api/games/trial/update", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.post("/api/games/trial/update", authMiddleware, (req, res) => {
     try {
       const { gameId, minutesPlayed } = req.body;
       
@@ -1782,7 +1564,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Trial not available for this game" });
       }
 
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -1800,7 +1582,7 @@ export async function registerRoutes(
         },
       };
 
-      updateOne<User>("users.json", (u) => u.id === req.user!.userId, {
+      updateOne("users.json", (u) => u.id === req.user.userId, {
         trialUsage: updatedTrialUsage,
       });
 
@@ -1816,7 +1598,7 @@ export async function registerRoutes(
   });
 
   // Check Nexar+ collection access
-  app.post("/api/games/nexarplus/check", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.post("/api/games/nexarplus/check", authMiddleware, (req, res) => {
     try {
       const { gameId } = req.body;
       
@@ -1833,7 +1615,7 @@ export async function registerRoutes(
         return res.json({ allowed: true, isNexarPlusGame: false });
       }
 
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -1854,7 +1636,7 @@ export async function registerRoutes(
   });
 
   // Get discounted price for a game
-  app.get("/api/games/:gameId/price", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.get("/api/games/:gameId/price", authMiddleware, (req, res) => {
     try {
       const { gameId } = req.params;
       
@@ -1863,7 +1645,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Game not found" });
       }
 
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -1894,7 +1676,7 @@ export async function registerRoutes(
   // ========================================
 
   // Apply as developer
-  app.post("/api/developer/apply", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.post("/api/developer/apply", authMiddleware, (req, res) => {
     try {
       const { studioName, contactEmail, website, description } = req.body;
 
@@ -1902,7 +1684,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Studio name, contact email, and description are required" });
       }
 
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -1915,7 +1697,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "You are already an approved developer" });
       }
 
-      const developerProfile: DeveloperProfile = {
+      const developerProfile = {
         studioName,
         contactEmail,
         website: website || "",
@@ -1923,7 +1705,7 @@ export async function registerRoutes(
         status: "pending",
       };
 
-      updateOne<User>("users.json", (u) => u.id === req.user!.userId, {
+      updateOne("users.json", (u) => u.id === req.user.userId, {
         developerProfile,
       });
 
@@ -1935,9 +1717,9 @@ export async function registerRoutes(
   });
 
   // Get developer status
-  app.get("/api/developer/status", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.get("/api/developer/status", authMiddleware, (req, res) => {
     try {
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -1953,14 +1735,14 @@ export async function registerRoutes(
   });
 
   // Admin: Get all developer applications
-  app.get("/api/admin/developer/applications", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.get("/api/admin/developer/applications", authMiddleware, (req, res) => {
     try {
-      const adminUser = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const adminUser = findOne("users.json", (u) => u.id === req.user.userId);
       if (!adminUser || adminUser.role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
       }
 
-      const applications = findMany<User>("users.json", (u) => 
+      const applications = findMany("users.json", (u) => 
         u.developerProfile?.status === "pending"
       ).map(u => ({
         userId: u.id,
@@ -1978,11 +1760,11 @@ export async function registerRoutes(
   });
 
   // Admin: Approve developer
-  app.post("/api/admin/developer/approve", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.post("/api/admin/developer/approve", authMiddleware, (req, res) => {
     try {
       const { userId } = req.body;
 
-      const adminUser = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const adminUser = findOne("users.json", (u) => u.id === req.user.userId);
       if (!adminUser || adminUser.role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -1991,7 +1773,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "User ID is required" });
       }
 
-      const targetUser = findOne<User>("users.json", (u) => u.id === userId);
+      const targetUser = findOne("users.json", (u) => u.id === userId);
       if (!targetUser) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -2000,7 +1782,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "User has no developer application" });
       }
 
-      updateOne<User>("users.json", (u) => u.id === userId, {
+      updateOne("users.json", (u) => u.id === userId, {
         role: "developer",
         developerProfile: {
           ...targetUser.developerProfile,
@@ -2016,11 +1798,11 @@ export async function registerRoutes(
   });
 
   // Admin: Reject developer
-  app.post("/api/admin/developer/reject", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.post("/api/admin/developer/reject", authMiddleware, (req, res) => {
     try {
       const { userId } = req.body;
 
-      const adminUser = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const adminUser = findOne("users.json", (u) => u.id === req.user.userId);
       if (!adminUser || adminUser.role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -2029,7 +1811,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "User ID is required" });
       }
 
-      const targetUser = findOne<User>("users.json", (u) => u.id === userId);
+      const targetUser = findOne("users.json", (u) => u.id === userId);
       if (!targetUser) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -2038,7 +1820,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "User has no developer application" });
       }
 
-      updateOne<User>("users.json", (u) => u.id === userId, {
+      updateOne("users.json", (u) => u.id === userId, {
         developerProfile: {
           ...targetUser.developerProfile,
           status: "rejected",
@@ -2057,11 +1839,11 @@ export async function registerRoutes(
   // ========================================
 
   // Create a new game
-  app.post("/api/developer/game/create", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.post("/api/developer/game/create", authMiddleware, (req, res) => {
     try {
       const { title, description, price, genre, tags, coverImage } = req.body;
 
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -2074,7 +1856,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Title, description, price, and genre are required" });
       }
 
-      const game: DeveloperGame = {
+      const game = {
         gameId: uuidv4(),
         developerId: user.id,
         title,
@@ -2099,7 +1881,7 @@ export async function registerRoutes(
   });
 
   // Update a game
-  app.post("/api/developer/game/update", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.post("/api/developer/game/update", authMiddleware, (req, res) => {
     try {
       const { gameId, title, description, price, genre, tags, coverImage } = req.body;
 
@@ -2107,12 +1889,12 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Game ID is required" });
       }
 
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
 
-      const game = findOne<DeveloperGame>("developerGames.json", (g) => g.gameId === gameId);
+      const game = findOne("developerGames.json", (g) => g.gameId === gameId);
       if (!game) {
         return res.status(404).json({ message: "Game not found" });
       }
@@ -2121,7 +1903,7 @@ export async function registerRoutes(
         return res.status(403).json({ message: "You can only edit your own games" });
       }
 
-      const updates: Partial<DeveloperGame> = {
+      const updates = {
         updatedAt: new Date().toISOString(),
       };
 
@@ -2132,7 +1914,7 @@ export async function registerRoutes(
       if (tags) updates.tags = tags;
       if (coverImage !== undefined) updates.coverImage = coverImage;
 
-      const updatedGame = updateOne<DeveloperGame>("developerGames.json", (g) => g.gameId === gameId, updates);
+      const updatedGame = updateOne("developerGames.json", (g) => g.gameId === gameId, updates);
 
       res.json({ success: true, game: updatedGame });
     } catch (error) {
@@ -2142,7 +1924,7 @@ export async function registerRoutes(
   });
 
   // Submit game for review
-  app.post("/api/developer/game/submitForReview", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.post("/api/developer/game/submitForReview", authMiddleware, (req, res) => {
     try {
       const { gameId } = req.body;
 
@@ -2150,12 +1932,12 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Game ID is required" });
       }
 
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
 
-      const game = findOne<DeveloperGame>("developerGames.json", (g) => g.gameId === gameId);
+      const game = findOne("developerGames.json", (g) => g.gameId === gameId);
       if (!game) {
         return res.status(404).json({ message: "Game not found" });
       }
@@ -2168,7 +1950,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Only draft or rejected games can be submitted for review" });
       }
 
-      updateOne<DeveloperGame>("developerGames.json", (g) => g.gameId === gameId, {
+      updateOne("developerGames.json", (g) => g.gameId === gameId, {
         status: "pending",
         updatedAt: new Date().toISOString(),
       });
@@ -2181,9 +1963,9 @@ export async function registerRoutes(
   });
 
   // Get developer's games
-  app.get("/api/developer/games", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.get("/api/developer/games", authMiddleware, (req, res) => {
     try {
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -2192,7 +1974,7 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Only approved developers can view their games" });
       }
 
-      const games = findMany<DeveloperGame>("developerGames.json", (g) => g.developerId === user.id);
+      const games = findMany("developerGames.json", (g) => g.developerId === user.id);
 
       res.json(games);
     } catch (error) {
@@ -2202,16 +1984,16 @@ export async function registerRoutes(
   });
 
   // Get single game for editing
-  app.get("/api/developer/game/:gameId", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.get("/api/developer/game/:gameId", authMiddleware, (req, res) => {
     try {
       const { gameId } = req.params;
 
-      const user = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const user = findOne("users.json", (u) => u.id === req.user.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
 
-      const game = findOne<DeveloperGame>("developerGames.json", (g) => g.gameId === gameId);
+      const game = findOne("developerGames.json", (g) => g.gameId === gameId);
       if (!game) {
         return res.status(404).json({ message: "Game not found" });
       }
@@ -2228,17 +2010,17 @@ export async function registerRoutes(
   });
 
   // Admin: Get all pending games
-  app.get("/api/admin/games/pending", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.get("/api/admin/games/pending", authMiddleware, (req, res) => {
     try {
-      const adminUser = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const adminUser = findOne("users.json", (u) => u.id === req.user.userId);
       if (!adminUser || adminUser.role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
       }
 
-      const pendingGames = findMany<DeveloperGame>("developerGames.json", (g) => g.status === "pending");
+      const pendingGames = findMany("developerGames.json", (g) => g.status === "pending");
 
       const gamesWithDeveloper = pendingGames.map(game => {
-        const developer = findOne<User>("users.json", (u) => u.id === game.developerId);
+        const developer = findOne("users.json", (u) => u.id === game.developerId);
         return {
           ...game,
           developerName: developer?.developerProfile?.studioName || developer?.username || "Unknown",
@@ -2253,11 +2035,11 @@ export async function registerRoutes(
   });
 
   // Admin: Approve game
-  app.post("/api/admin/game/approve", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.post("/api/admin/game/approve", authMiddleware, (req, res) => {
     try {
       const { gameId } = req.body;
 
-      const adminUser = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const adminUser = findOne("users.json", (u) => u.id === req.user.userId);
       if (!adminUser || adminUser.role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -2266,24 +2048,24 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Game ID is required" });
       }
 
-      const game = findOne<DeveloperGame>("developerGames.json", (g) => g.gameId === gameId);
+      const game = findOne("developerGames.json", (g) => g.gameId === gameId);
       if (!game) {
         return res.status(404).json({ message: "Game not found" });
       }
 
-      updateOne<DeveloperGame>("developerGames.json", (g) => g.gameId === gameId, {
+      updateOne("developerGames.json", (g) => g.gameId === gameId, {
         status: "approved",
         updatedAt: new Date().toISOString(),
       });
 
       // Award developer achievement if this is their first approved game
-      const developer = findOne<User>("users.json", (u) => u.id === game.developerId);
+      const developer = findOne("users.json", (u) => u.id === game.developerId);
       if (developer) {
-        const existingAchievement = findOne<UserAchievement>("achievements.json", 
+        const existingAchievement = findOne("achievements.json", 
           (a) => a.userId === developer.id && a.achievementId === "developer"
         );
         if (!existingAchievement) {
-          insertOne<UserAchievement>("achievements.json", {
+          insertOne("achievements.json", {
             id: uuidv4(),
             userId: developer.id,
             achievementId: "developer",
@@ -2300,11 +2082,11 @@ export async function registerRoutes(
   });
 
   // Admin: Reject game
-  app.post("/api/admin/game/reject", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.post("/api/admin/game/reject", authMiddleware, (req, res) => {
     try {
       const { gameId, reason } = req.body;
 
-      const adminUser = findOne<User>("users.json", (u) => u.id === req.user!.userId);
+      const adminUser = findOne("users.json", (u) => u.id === req.user.userId);
       if (!adminUser || adminUser.role !== "admin") {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -2313,12 +2095,12 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Game ID is required" });
       }
 
-      const game = findOne<DeveloperGame>("developerGames.json", (g) => g.gameId === gameId);
+      const game = findOne("developerGames.json", (g) => g.gameId === gameId);
       if (!game) {
         return res.status(404).json({ message: "Game not found" });
       }
 
-      updateOne<DeveloperGame>("developerGames.json", (g) => g.gameId === gameId, {
+      updateOne("developerGames.json", (g) => g.gameId === gameId, {
         status: "rejected",
         updatedAt: new Date().toISOString(),
       });
@@ -2333,13 +2115,21 @@ export async function registerRoutes(
   // Get approved developer games for store
   app.get("/api/store/developer-games", (req, res) => {
     try {
-      const approvedGames = findMany<DeveloperGame>("developerGames.json", (g) => g.status === "approved");
+      const approvedGames = findMany("developerGames.json", (g) => g.status === "approved");
 
       const gamesWithDeveloper = approvedGames.map(game => {
-        const developer = findOne<User>("users.json", (u) => u.id === game.developerId);
+        const developer = findOne("users.json", (u) => u.id === game.developerId);
         return {
-          ...game,
+          id: `dev-${game.gameId}`,
+          gameId: game.gameId,
+          title: game.title,
+          description: game.description,
+          price: game.price,
+          genre: game.genre,
+          tags: game.tags,
+          coverImage: game.coverImage,
           developerName: developer?.developerProfile?.studioName || developer?.username || "Unknown",
+          isDeveloperGame: true,
         };
       });
 
@@ -2351,31 +2141,29 @@ export async function registerRoutes(
   });
 
   // Admin: Set user as admin (for initial setup)
-  app.post("/api/admin/make-admin", authMiddleware, (req: AuthenticatedRequest, res) => {
+  app.post("/api/admin/set-admin", async (req, res) => {
     try {
-      const { secretKey, targetUserId } = req.body;
-
-      // Simple secret key check for initial admin setup
-      if (secretKey !== "nexaros-admin-setup-2024") {
-        return res.status(403).json({ message: "Invalid secret key" });
+      const { email, secret } = req.body;
+      
+      // Simple secret check for initial admin setup
+      if (secret !== process.env.ADMIN_SECRET && secret !== "nexaros-admin-setup-2024") {
+        return res.status(403).json({ message: "Invalid secret" });
       }
 
-      const userId = targetUserId || req.user!.userId;
-      const user = findOne<User>("users.json", (u) => u.id === userId);
+      const user = findOne("users.json", (u) => u.email === email);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
 
-      updateOne<User>("users.json", (u) => u.id === userId, {
-        role: "admin",
-      });
-
-      res.json({ success: true, message: "User is now an admin" });
+      updateOne("users.json", (u) => u.email === email, { role: "admin" });
+      res.json({ success: true, message: "User promoted to admin" });
     } catch (error) {
-      console.error("Make admin error:", error);
-      res.status(500).json({ message: "Failed to make admin" });
+      console.error("Set admin error:", error);
+      res.status(500).json({ message: "Failed to set admin" });
     }
   });
 
   return httpServer;
 }
+
+module.exports = { registerRoutes };

@@ -1,10 +1,10 @@
-import express from "express";
-import cors from "cors";
-import { createServer } from "http";
-import { registerRoutes } from "./routes.js";
+const express = require("express");
+const cors = require("cors");
+const http = require("http");
+const { registerRoutes } = require("./routes.js");
 
 const app = express();
-const httpServer = createServer(app);
+const httpServer = http.createServer(app);
 
 app.use(cors());
 app.use(express.json());

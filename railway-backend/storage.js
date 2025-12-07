@@ -1,38 +1,28 @@
-import { type User, type InsertUser } from "@shared/schema";
-import { randomUUID } from "crypto";
+const { randomUUID } = require("crypto");
 
-// modify the interface with any CRUD methods
-// you might need
-
-export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
-}
-
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-
+class MemStorage {
   constructor() {
     this.users = new Map();
   }
 
-  async getUser(id: string): Promise<User | undefined> {
+  async getUser(id) {
     return this.users.get(id);
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
+  async getUserByUsername(username) {
     return Array.from(this.users.values()).find(
-      (user) => user.username === username,
+      (user) => user.username === username
     );
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
+  async createUser(insertUser) {
     const id = randomUUID();
-    const user: User = { ...insertUser, id };
+    const user = { ...insertUser, id };
     this.users.set(id, user);
     return user;
   }
 }
 
-export const storage = new MemStorage();
+const storage = new MemStorage();
+
+module.exports = { storage, MemStorage };
