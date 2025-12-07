@@ -4,116 +4,46 @@ const FROM_EMAIL = 'NexarOS <hello@nexargames.co.uk>';
 
 function getResendClient() {
   const apiKey = process.env.RESEND_API_KEY;
-  
-  if (!apiKey) {
-    console.error('[Email] ERROR: RESEND_API_KEY not set');
-    throw new Error('RESEND_API_KEY not configured');
-  }
-  
-  console.log('[Email] Using RESEND_API_KEY from environment');
-  return {
-    client: new Resend(apiKey),
-    fromEmail: FROM_EMAIL
-  };
+  if (!apiKey) throw new Error("RESEND_API_KEY missing");
+  return new Resend(apiKey);
 }
 
-async function sendVerificationEmail(toEmail, username, verificationToken) {
-  console.log('[Email] sendVerificationEmail called for:', toEmail);
-  
-  try {
-    const { client, fromEmail } = getResendClient();
-    console.log('[Email] Got client, fromEmail:', fromEmail);
-    
-    const verifyUrl = `${process.env.BASE_URL}/verify?token=${verificationToken}`;
-    console.log('[Email] Verification link:', verifyUrl);
-    
-    const html = `
-      <div style="background:#111; padding:40px; color:#fff; font-family:Arial, sans-serif;">
-        <h1 style="color:#ff1744;">Welcome to NexarOS, ${username}!</h1>
-        <p>Thank you for creating your NexarOS account. Please verify your email address to unlock all features.</p>
-        
-        <a href="${verifyUrl}" 
-           style="display:inline-block; padding:12px 20px; background:#ff1744; color:#fff; 
-                  text-decoration:none; border-radius:6px; font-size:16px; margin:20px 0;">
-          Verify Email
-        </a>
-
-        <p>If you didn't create this account, you can safely ignore this email.</p>
-
-        <p style="font-size:13px; color:#bbb;">If the button doesn't work, use this link:<br>
-          <a href="${verifyUrl}" style="color:#4da3ff;">${verifyUrl}</a>
-        </p>
-      </div>
-    `;
-    
-    console.log('[Email] Sending email via Resend...');
-    const result = await client.emails.send({
-      from: fromEmail,
-      to: toEmail,
-      subject: 'Verify your NexarOS account',
-      html
-    });
-    
-    console.log('[Email] Resend API response:', JSON.stringify(result, null, 2));
-    
-    if (result.error) {
-      console.error('[Email] Resend returned error:', result.error);
-      return false;
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('[Email] FAILED to send verification email:', error);
+async function sendVerificationEmail(toEmail, username, token) {
+  const baseUrl = process.env.BASE_URL;
+  if (!baseUrl) {
+    console.error("❌ BASE_URL is missing in backend environment!");
     return false;
   }
-}
 
-async function sendPasswordResetEmail(toEmail, username, resetToken) {
-  console.log('[Email] sendPasswordResetEmail called for:', toEmail);
-  
+  const verifyUrl = `${baseUrl}/verify?token=${token}`;
+  console.log("📨 Sending verification email with URL:", verifyUrl);
+
+  const resend = getResendClient();
+
   try {
-    const { client, fromEmail } = getResendClient();
-    
-    const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
-    
-    const resetLink = `${baseUrl}/api/auth/reset-password?token=${resetToken}`;
-    
-    console.log('[Email] Sending password reset email...');
-    const result = await client.emails.send({
-      from: fromEmail,
+    await resend.emails.send({
+      from: FROM_EMAIL,
       to: toEmail,
-      subject: 'Reset your NexarOS password',
+      subject: "Verify your NexarOS account",
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #111; color: #fff; padding: 40px; border-radius: 8px;">
-          <h1 style="color: #d00024; margin-bottom: 24px;">Password Reset Request</h1>
-          <p style="font-size: 16px; line-height: 1.6; margin-bottom: 24px;">
-            Hi ${username}, we received a request to reset your NexarOS password.
-          </p>
-          <a href="${resetLink}" style="display: inline-block; background: #d00024; color: #fff; padding: 12px 32px; border-radius: 6px; text-decoration: none; font-weight: bold;">
-            Reset Password
+        <div style="font-family: Arial; background: #111; padding: 40px; color: #fff; border-radius: 8px;">
+          <h1 style="color: #ff1744;">Welcome to NexarOS, ${username}!</h1>
+          <p>Please verify your email to unlock all features.</p>
+          <a href="${verifyUrl}" 
+            style="display:inline-block; padding:12px 24px; background:#ff1744; color:#fff; text-decoration:none; border-radius:6px; font-weight:bold;">
+            Verify Email
           </a>
-          <p style="font-size: 14px; color: #888; margin-top: 32px;">
-            If you didn't request this, you can safely ignore this email.
-          </p>
+          <p style="color:#bbb; margin-top:20px;">Or copy this link:</p>
+          <a href="${verifyUrl}" style="color:#4dabf7;">${verifyUrl}</a>
         </div>
-      `
+      `,
     });
-    
-    console.log('[Email] Resend API response:', JSON.stringify(result, null, 2));
-    
-    if (result.error) {
-      console.error('[Email] Resend returned error:', result.error);
-      return false;
-    }
-    
+
     return true;
-  } catch (error) {
-    console.error('[Email] FAILED to send password reset email:', error);
+  } catch (err) {
+    console.error("❌ Email send failed:", err);
     return false;
   }
 }
 
-module.exports = {
-  sendVerificationEmail,
-  sendPasswordResetEmail
-};
+module.exports = { sendVerificationEmail };
