@@ -1,0 +1,89 @@
+I need you to automatically create a clean backend folder for deployment to Railway.
+Follow these steps exactly:
+
+=====================================================
+🔴 1. Create a new folder at project root named /railway-backend
+
+=====================================================
+🔴 2. Identify all backend code
+Backend code is currently inside:
+
+/server
+
+/shared
+
+Any backend config files at root (e.g., package.json, tsconfig.json)
+
+Frontend files (React) must NOT be included.
+
+=====================================================
+🔴 3. Move ALL backend files into /railway-backend
+Inside /railway-backend, the structure must be FLAT — not nested.
+
+The final /railway-backend folder MUST contain:
+
+/railway-backend
+package.json
+server.js or index.js (whichever is the backend entry)
+routes/
+controllers/
+utils/
+data/
+shared/
+.env.example
+.gitignore
+tsconfig.json (if needed)
+
+Rules:
+
+If backend entry file is inside /server, move it directly into /railway-backend
+
+DO NOT leave any backend files inside nested folders like /server/server.js
+
+Flatten everything so Railway can detect Node.js
+
+=====================================================
+🔴 4. Generate a correct package.json in /railway-backend
+If one exists already, rewrite it so it looks like this (modify entry file name accordingly):
+
+{
+"name": "nexaros-backend",
+"version": "1.0.0",
+"main": "server.js",
+"scripts": {
+"start": "node server.js"
+},
+"dependencies": {
+"express": "^4.18.2",
+"bcrypt": "^5.1.0",
+"jsonwebtoken": "^9.0.0",
+"cors": "^2.8.5",
+"stripe": "^12.0.0",
+"dotenv": "^16.0.0",
+"resend": "^3.0.0"
+}
+}
+
+If the entry file is named index.js, replace server.js with index.js.
+
+=====================================================
+🔴 5. Fix all import paths
+If any backend files reference "../server/..." update them so they correctly reference the new flattened structure.
+
+=====================================================
+🔴 6. Do NOT modify any frontend files
+Only backend files should be copied and reorganized.
+
+=====================================================
+🔴 7. When finished, confirm the final folder structure
+Tell me:
+
+The entry file name
+
+The final file tree for /railway-backend
+
+Whether everything is ready for ZIP export
+
+=====================================================
+
+This prepares the backend for Railway deployment.
