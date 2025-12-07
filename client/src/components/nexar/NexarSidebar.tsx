@@ -20,6 +20,7 @@ const navItems: { id: NavPage; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Home", icon: Home },
   { id: "library", label: "Library", icon: Library },
   { id: "store", label: "Store", icon: ShoppingBag },
+  { id: "wallet", label: "Wallet", icon: Wallet },
   { id: "downloads", label: "Downloads", icon: Download },
   { id: "nexarplus", label: "Nexar+", icon: Crown },
 ];
@@ -30,12 +31,11 @@ const nexarIdItems: { id: NavPage; label: string; icon: typeof Home }[] = [
   { id: "messages", label: "Messages", icon: MessageCircle },
   { id: "achievements", label: "Achievements", icon: Trophy },
   { id: "cloud", label: "Cloud Saves", icon: Cloud },
-  { id: "wallet", label: "Wallet", icon: Wallet },
-  { id: "developer", label: "Developer", icon: Code },
 ];
 
 const settingsItems: { id: NavPage; label: string; icon: typeof Home }[] = [
   { id: "settings", label: "Settings", icon: Settings },
+  { id: "developer", label: "Developer", icon: Code },
 ];
 
 export default function NexarSidebar({ currentPage, onNavigate, downloadCount, pendingFriendRequests, user, onLogout }: NexarSidebarProps) {
