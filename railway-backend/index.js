@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const http = require("http");
 const { registerRoutes } = require("./routes.js");
+const { initDb } = require("./initDb");
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -33,6 +34,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  await initDb();
   await registerRoutes(httpServer, app);
 
   app.use((err, _req, res, _next) => {
