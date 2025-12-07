@@ -1,6 +1,6 @@
-const { Resend } = require('resend');
+const { Resend } = require("resend");
 
-const FROM_EMAIL = 'NexarOS <hello@nexargames.co.uk>';
+const FROM_EMAIL = "NexarOS <hello@nexargames.co.uk>";
 
 function getResendClient() {
   const apiKey = process.env.RESEND_API_KEY;
@@ -8,14 +8,44 @@ function getResendClient() {
   return new Resend(apiKey);
 }
 
+// Helper: normalise base URLs (remove trailing slash)
+function normalizeBaseUrl(url) {
+  return url.replace(/\/+$/, "");
+}
+
+// BACKEND URL: used for API endpoints like /api/auth/verify
+function getBackendBaseUrl() {
+  const url = process.env.BASE_URL || process.env.BACKEND_URL;
+  if (!url) {
+    throw new Error("Backend BASE_URL/BACKEND_URL missing");
+  }
+  return normalizeBaseUrl(url);
+}
+
+// FRONTEND URL: where the user actually visits pages in their browser
+// e.g. https://nexargames.co.uk or your NexarOS frontend domain.
+function getFrontendBaseUrl() {
+  const url = process.env.FRONTEND_URL || process.env.PUBLIC_FRONTEND_URL;
+  if (!url) {
+    throw new Error("FRONTEND_URL/PUBLIC_FRONTEND_URL missing");
+  }
+  return normalizeBaseUrl(url);
+}
+
+// =======================
+// EMAIL: VERIFY ACCOUNT
+// =======================
 async function sendVerificationEmail(toEmail, username, token) {
-  const baseUrl = process.env.BASE_URL;
-  if (!baseUrl) {
-    console.error("❌ BASE_URL is missing in backend environment!");
+  let verifyUrl;
+  try {
+    const backendBaseUrl = getBackendBaseUrl();
+    // IMPORTANT: this matches your backend route: app.get("/api/auth/verify", ...)
+    verifyUrl = `${backendBaseUrl}/api/auth/verify?token=${token}`;
+  } catch (err) {
+    console.error("❌ Cannot build verification URL:", err.message);
     return false;
   }
 
-  const verifyUrl = `${baseUrl}/api/auth/verify?token=${token}`;
   console.log("📨 Sending verification email with URL:", verifyUrl);
 
   const resend = getResendClient();
@@ -26,10 +56,10 @@ async function sendVerificationEmail(toEmail, username, token) {
       to: toEmail,
       subject: "Verify your NexarOS account",
       html: `
-        <div style="font-family: Arial; background: #111; padding: 40px; color: #fff; border-radius: 8px;">
+        <div style="font-family: Arial, sans-serif; background: #111; padding: 40px; color: #fff; border-radius: 8px;">
           <h1 style="color: #ff1744;">Welcome to NexarOS, ${username}!</h1>
           <p>Please verify your email to unlock all features.</p>
-          <a href="${verifyUrl}" 
+          <a href="${verifyUrl}"
             style="display:inline-block; padding:12px 24px; background:#ff1744; color:#fff; text-decoration:none; border-radius:6px; font-weight:bold;">
             Verify Email
           </a>
@@ -41,9 +71,65 @@ async function sendVerificationEmail(toEmail, username, token) {
 
     return true;
   } catch (err) {
-    console.error("❌ Email send failed:", err);
+    console.error("❌ Email send failed (verification):", err);
     return false;
   }
 }
 
-module.exports = { sendVerificationEmail };
+// =======================
+// EMAIL: PASSWORD RESET
+// =======================
+async function sendPasswordResetEmail(toEmail, username, token) {
+  let resetUrl;
+  try {
+    const frontendBaseUrl = getFrontendBaseUrl();
+    // IMPORTANT:
+    // This assumes your frontend has a route like:
+    //   /reset-password?token=...
+    //
+    // If your actual page is different (e.g. /auth/reset?token=...)
+    // change ONLY the path below.
+    resetUrl = `${frontendBaseUrl}/reset-password?token=${token}`;
+  } catch (err) {
+    console.error("❌ Cannot build password reset URL:", err.message);
+    return false;
+  }
+
+  console.log("📨 Sending password reset email with URL:", resetUrl);
+
+  const resend = getResendClient();
+
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: toEmail,
+      subject: "Reset your NexarOS password",
+      html: `
+        <div style="font-family: Arial, sans-serif; background: #111; padding: 40px; color: #fff; border-radius: 8px;">
+          <h1 style="color: #ff1744;">Password reset requested</h1>
+          <p>Hi ${username},</p>
+          <p>We received a request to reset your NexarOS password. Click the button below to choose a new password.</p>
+          <a href="${resetUrl}"
+            style="display:inline-block; padding:12px 24px; background:#ff1744; color:#fff; text-decoration:none; border-radius:6px; font-weight:bold;">
+            Reset Password
+          </a>
+          <p style="color:#bbb; margin-top:20px;">Or copy this link:</p>
+          <a href="${resetUrl}" style="color:#4dabf7;">${resetUrl}</a>
+          <p style="color:#777; margin-top:20px; font-size:12px;">
+            If you did not request this, you can safely ignore this email.
+          </p>
+        </div>
+      `,
+    });
+
+    return true;
+  } catch (err) {
+    console.error("❌ Email send failed (password reset):", err);
+    return false;
+  }
+}
+
+module.exports = {
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+};
