@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, XCircle, Loader2, Mail } from "lucide-react";
+import { API_BASE_URL } from "@/lib/queryClient";
 
 export default function VerifyEmailPage() {
   const [, setLocation] = useLocation();
@@ -24,7 +25,7 @@ export default function VerifyEmailPage() {
 
   const verifyEmail = async (token: string) => {
     try {
-      const response = await fetch(`/api/auth/verify?token=${token}`);
+      const response = await fetch(`${API_BASE_URL}/api/auth/verify?token=${token}`);
       const data = await response.json();
 
       if (response.ok) {

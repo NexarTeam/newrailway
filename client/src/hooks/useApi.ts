@@ -1,5 +1,6 @@
 import { useAuth } from "./useAuth";
 import { useCallback } from "react";
+import { API_BASE_URL } from "@/lib/queryClient";
 
 export function useApi() {
   const { token, logout } = useAuth();
@@ -14,7 +15,8 @@ export function useApi() {
         headers.set("Content-Type", "application/json");
       }
 
-      const res = await fetch(url, { ...options, headers });
+      const fullUrl = url.startsWith("/") ? `${API_BASE_URL}${url}` : url;
+      const res = await fetch(fullUrl, { ...options, headers });
 
       if (res.status === 401) {
         logout();
